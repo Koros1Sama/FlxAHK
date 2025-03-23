@@ -1,0 +1,2 @@
+﻿WinMinimize, A
+return
