@@ -1,8 +1,10 @@
-﻿#SingleInstance force
+﻿;Use Ctrl + Shift + Win + "+"or"=" to Open the manage menu
+;Use your Flx Button + "," to Open the secure menu and it turns on by using Flx + F
+;There is some Hotkeys are better to Remove Like the Flx + x it's in the script
+#SingleInstance force
 #Persistent
 #NoEnv
-#UseHook On          ; لتحسين أداء الاختصارات المعقدة
-#InstallKeybdHook    ; لضمان تتبع المفاتيح بشكل جيد
+
 ;------------------ Global Settings ------------------
 iniFile := A_ScriptDir "\Flx_Settings.ini"
 scriptsDir := A_ScriptDir "\Scripts"
@@ -17,7 +19,7 @@ IniRead, isSecureMode, %iniFile%, Settings, IsSecureMode, 0
 IniRead, baseHotkey, %iniFile%, HotkeySettings, BaseKey, SC056
 global baseHotkey
 
-; تحميل الاختصارات البسيطة مع شروط النافذة
+; Load simple hotkeys with window conditions
 CustomHotkeys := {}
 IniRead, customKeys, %iniFile%, CustomHotkeys
 if (customKeys = "ERROR") {
@@ -47,12 +49,12 @@ Loop, Parse, customKeys, `n
         try {
             Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
         } catch e {
-            MsgBox, 48, خطأ, فشل تعريف الاختصار عند التحميل: %baseHotkey% & %baseKey%`nالسبب: %e%
+            MsgBox, 48, Error, Failed to define hotkey on load: %baseHotkey% & %baseKey%`nReason: %e%
         }
     }
 }
 
-; تحميل السكربتات المتقدمة مع شروط النافذة
+; Load advanced scripts with window conditions
 AdvancedScripts := {}
 IniRead, advScripts, %iniFile%, AdvancedScripts
 if (advScripts = "ERROR") {
@@ -84,15 +86,15 @@ Loop, Parse, advScripts, `n
             try {
                 Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
             } catch e {
-                MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم عند التحميل: %baseHotkey% & %baseKey%`nالسبب: %e%
+                MsgBox, 48, Error, Failed to define advanced script on load: %baseHotkey% & %baseKey%`nReason: %e%
             }
         } else {
-            MsgBox, 48, تحذير, ملف السكربت غير موجود: %scriptPath%
+            MsgBox, 48, Warning, Script file not found: %scriptPath%
         }
     }
 }
 
-; تحميل الاختصارات بدون Flx مع شروط النافذة
+; Load hotkeys without Flx with window conditions
 NoFlxHotkeys := {}
 IniRead, noFlxKeys, %iniFile%, NoFlx
 if (noFlxKeys = "ERROR") {
@@ -121,18 +123,18 @@ Loop, Parse, noFlxKeys, `n
         try {
             Hotkey, %key%, ExecuteNoFlxHotkey, On
         } catch e {
-            MsgBox, 48, خطأ, فشل تعريف الاختصار بدون Flx عند التحميل: %key%`nالسبب: %e%
+            MsgBox, 48, Error, Failed to define hotkey without Flx on load: %key%`nReason: %e%
         }
     }
 }
 
-; واجهة مؤشر وضع التسريع
+; Secure Mode Indicator GUI
 Gui, SecureModeIndicator:+LastFound +AlwaysOnTop +ToolWindow -Caption +E0x20
 Gui, SecureModeIndicator:Color, 000000
 WinSet, TransColor, 000000
 Gui, SecureModeIndicator:Font, s12 cFFFFFF, Arial
-Gui, SecureModeIndicator:Add, Text, BackgroundTrans, وضع التسريع
-Gui, SecureModeIndicator:Show, x0 y0 w100 h30 NoActivate
+Gui, SecureModeIndicator:Add, Text, BackgroundTrans, Secure Mode
+Gui, SecureModeIndicator:Show, x0 y0 w120 h40 NoActivate
 WinSet, Transparent, 150
 if (isSecureMode) {
     Gui, SecureModeIndicator:Show, NoActivate
@@ -150,7 +152,7 @@ Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI
 try {
     Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
 } catch e {
-    MsgBox, 48, خطأ, فشل تعريف الاختصار %baseHotkey% & X`nالسبب: %e%
+    MsgBox, 48, Error, Failed to define hotkey %baseHotkey% & X`nReason: %e%
 }
 
 ^#+=::
@@ -161,19 +163,19 @@ return
 
 OpenInteractiveMode:
     global baseHotkey
-    ; التحقق مما إذا كانت الواجهة مفتوحة بالفعل
-    IfWinExist, قائمة الاختصارات
+    ; Check if the GUI is already open
+    IfWinExist, Hotkey Menu
     {
         Gui, InteractiveMenu:Destroy
         return
     }
-    ; إذا لم تكن مفتوحة، افتحها
-    Gui, InteractiveMenu:Destroy  ; تدمير أي نسخة قديمة للتأكد
+    ; If not open, create it
+    Gui, InteractiveMenu:Destroy  ; Destroy any old instance to ensure freshness
     Gui, InteractiveMenu:Color, 2D2D2D
     Gui, InteractiveMenu:Font, c000000 s10, Segoe UI
-    Gui, InteractiveMenu:Add, Text, x10 y10 w300 h25 Center cFFD700, اختر اختصارًا
+    Gui, InteractiveMenu:Add, Text, x10 y10 w300 h25 Center cFFD700, Select a Hotkey
     Gui, InteractiveMenu:Add, ListBox, x10 y40 w300 h230 vSelectedHotkey gExecuteFromMenu, % GenerateHotkeyListForMenu()
-    Gui, InteractiveMenu:Show, w320 h270, قائمة الاختصارات
+    Gui, InteractiveMenu:Show, w320 h270, Hotkey Menu
 return
 
 GenerateHotkeyListForMenu() {
@@ -210,17 +212,17 @@ ExecuteFromMenu:
     global CustomHotkeys, AdvancedScripts, NoFlxHotkeys, baseHotkey, scriptsDir
     Gui, InteractiveMenu:Submit, NoHide
     if (SelectedHotkey = "") {
-        return  ; لا تفعل شيئًا إذا لم يتم اختيار شيء
+        return  ; Do nothing if nothing is selected
     }
     SplitHotkey := StrSplit(SelectedHotkey, " - ")
     if (SplitHotkey.Length() < 2) {
-        MsgBox, 48, خطأ, تنسيق الاختصار غير صالح.
+        MsgBox, 48, Error, Invalid hotkey format.
         return
     }
     keyDisplay := SplitHotkey[1]
     actionOrScript := SplitHotkey[2]
     
-    ; استخراج الشرط إذا كان موجودًا
+    ; Extract condition if present
     condition := ""
     if (InStr(actionOrScript, "(")) {
         conditionStart := InStr(actionOrScript, "(")
@@ -229,24 +231,24 @@ ExecuteFromMenu:
         actionOrScript := Trim(SubStr(actionOrScript, 1, conditionStart - 1))
     }
     
-    ; تحديد ما إذا كان الاختصار يستخدم Flx أم لا
+    ; Determine if the hotkey uses Flx
     isFlx := InStr(keyDisplay, baseHotkey " & ")
     key := isFlx ? StrReplace(keyDisplay, baseHotkey " & ") : keyDisplay
     fullKey := StrReplace(key, ";", "VKBA") . (condition ? "|" . condition : "")
 
-    ; التحقق من الشرط إذا كان موجودًا
+    ; Check condition if present
     if (condition && !WinActive(condition)) {
-        MsgBox, 48, خطأ, النافذة المطلوبة غير نشطة: %condition%
+        MsgBox, 48, Error, Required window not active: %condition%
         return
     }
 
-    ; إغلاق الواجهة أولاً
+    ; Close the GUI first
     Gui, InteractiveMenu:Destroy
     
-    ; إضافة تأخير 70 مللي ثانية للسماح للنافذة السابقة بأن تصبح نشطة
+    ; Add a 70ms delay to allow the previous window to become active
     Sleep, 70
 
-    ; تنفيذ الاختصار بناءً على مصدره
+    ; Execute the hotkey based on its source
     if (isFlx && CustomHotkeys.HasKey(fullKey)) {
         action := CustomHotkeys[fullKey]
         ExecuteSingleAction(action)
@@ -258,16 +260,16 @@ ExecuteFromMenu:
             Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
             SetWorkingDir, %A_ScriptDir%
             if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
+                MsgBox, 48, Error, Failed to run script: %fullPath%`nError: %A_LastError%
             }
         } else {
-            MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
+            MsgBox, 48, Error, Script file not found: %fullPath%
         }
     } else if (!isFlx && NoFlxHotkeys.HasKey(fullKey)) {
         action := NoFlxHotkeys[fullKey]
         ExecuteSingleAction(action)
     } else {
-        MsgBox, 48, خطأ, الاختصار غير معرف: %fullKey%
+        MsgBox, 48, Error, Hotkey not defined: %fullKey%
     }
 return
 
@@ -340,25 +342,25 @@ OpenSettings() {
     Gui, GuiSettings:Destroy
     Gui, GuiSettings:Color, 2D2D2D
     Gui, GuiSettings:Font, cFFFFFF s10, Segoe UI
-    Gui, GuiSettings:Add, Text, x10 y10 w530 h30 Center cFFD700, إعدادات السكربت
-    Gui, GuiSettings:Add, Text, x10 y50 w200 h25, المجلدات المراقبة (افصل بفواصل):
+    Gui, GuiSettings:Add, Text, x10 y10 w530 h30 Center cFFD700, Script Settings
+    Gui, GuiSettings:Add, Text, x10 y50 w200 h50, Monitored Folders (separate with commas):
     Gui, GuiSettings:Add, Edit, x220 y50 w300 h25 vMonFolders c000000 Background424242, %monitoredFolders%
-    Gui, GuiSettings:Add, Button, x530 y50 w80 h25 gBrowseFolders, تصفح
-    Gui, GuiSettings:Add, Text, x10 y85 w200 h25, العمليات المراقبة (افصل بفواصل):
+    Gui, GuiSettings:Add, Button, x530 y50 w80 h25 gBrowseFolders, Browse
+    Gui, GuiSettings:Add, Text, x10 y85 w200 h50, Monitored Processes (separate with commas):
     Gui, GuiSettings:Add, Edit, x220 y85 w300 h25 vProcNames c000000 Background424242, %processNames%
-    Gui, GuiSettings:Add, Button, x530 y85 w80 h25 gBrowseProcesses, تصفح
-    Gui, GuiSettings:Add, Text, x10 y120 w200 h25, فترة الفحص (بالملي ثانية):
+    Gui, GuiSettings:Add, Button, x530 y85 w80 h25 gBrowseProcesses, Browse
+    Gui, GuiSettings:Add, Text, x10 y120 w200 h25, Check Interval (in milliseconds):
     Gui, GuiSettings:Add, Edit, x220 y120 w300 h25 vChkInterval c000000 Background424242, %checkInterval%
-    Gui, GuiSettings:Add, Button, x260 y165 w100 h30 gSaveSettings, حفظ
-    Gui, GuiSettings:Add, Button, x370 y165 w100 h30 gCancelSettings, إلغاء
+    Gui, GuiSettings:Add, Button, x260 y165 w100 h30 gSaveSettings, Save
+    Gui, GuiSettings:Add, Button, x370 y165 w100 h30 gCancelSettings, Cancel
     Gui, GuiSettings:Font, cA0A0A0 s8
-    Gui, GuiSettings:Add, Text, x10 y205 w620 h20 Center, استخدم الفواصل لفصل المجلدات والعمليات، أو زر التصفح للإضافة
-    Gui, GuiSettings:Show, w630 h230, إعدادات السكربت
+    Gui, GuiSettings:Add, Text, x10 y205 w620 h20 Center, Use commas to separate folders and processes, or use the browse button to add
+    Gui, GuiSettings:Show, w630 h230, Script Settings
 }
 
 BrowseFolders:
     Gui, GuiSettings:Submit, NoHide
-    FileSelectFolder, selectedFolder, , 3, اختر مجلدًا للمراقبة
+    FileSelectFolder, selectedFolder, , 3, Select a folder to monitor
     if (selectedFolder != "") {
         if (MonFolders = "")
             GuiControl, GuiSettings:, MonFolders, %selectedFolder%
@@ -369,7 +371,7 @@ return
 
 BrowseProcesses:
     Gui, GuiSettings:Submit, NoHide
-    FileSelectFile, selectedFile, 3, , اختر عملية للمراقبة, Executable Files (*.exe)
+    FileSelectFile, selectedFile, 3, , Select a process to monitor, Executable Files (*.exe)
     if (selectedFile != "") {
         SplitPath, selectedFile, fileName
         if (ProcNames = "")
@@ -387,7 +389,7 @@ SaveSettings:
     if (ChkInterval != "" && RegExMatch(ChkInterval, "^\d+$"))
         checkInterval := ChkInterval
     else {
-        MsgBox, 48, تحذير, يجب أن تكون فترة الفحص عددًا صحيحًا.
+        MsgBox, 48, Warning, Check interval must be an integer.
     }
     IniWrite, %monitoredFolders%, %iniFile%, Settings, MonitoredFolders
     IniWrite, %processNames%, %iniFile%, Settings, ProcessNames
@@ -404,58 +406,58 @@ OpenCustomHotkeysGUI() {
     Gui, CustomHotkeys:Destroy
     Gui, CustomHotkeys:Color, 2D2D2D
     Gui, CustomHotkeys:Font, cFFFFFF s10, Segoe UI
-    Gui, CustomHotkeys:Add, Tab3, x0 y0 w650 h400, أساسي|متقدم
-    Gui, CustomHotkeys:Tab, أساسي
-    Gui, CustomHotkeys:Add, Text, x20 y50 w610 h30 Center cFFD700, إدارة الاختصارات بسهولة
-    Gui, CustomHotkeys:Add, Text, x20 y90 w150 h25, المفتاح (مثل T أو 9):
+    Gui, CustomHotkeys:Add, Tab3, x0 y0 w650 h400, Basic|Advanced
+    Gui, CustomHotkeys:Tab, Basic
+    Gui, CustomHotkeys:Add, Text, x20 y50 w610 h30 Center cFFD700, Manage Hotkeys Easily
+    Gui, CustomHotkeys:Add, Text, x20 y90 w150 h25, Key (e.g., T or 9):
     Gui, CustomHotkeys:Add, Edit, x180 y90 w150 h25 vHotkeyKey c000000 Background424242,
-    Gui, CustomHotkeys:Add, Text, x340 y90 w300 h25 cA0A0A0, يمكن استخدام رموز مثل = أو , أيضاً
+    Gui, CustomHotkeys:Add, Text, x340 y90 w300 h50 cA0A0A0, Symbols like = or , can also be used
     Gui, CustomHotkeys:Add, CheckBox, x20 y120 w60 h25 vUseFlx Checked, Flx
     Gui, CustomHotkeys:Add, CheckBox, x90 y120 w60 h25 vUseCtrl, Ctrl
     Gui, CustomHotkeys:Add, CheckBox, x160 y120 w60 h25 vUseShift, Shift
     Gui, CustomHotkeys:Add, CheckBox, x230 y120 w60 h25 vUseAlt, Alt
     Gui, CustomHotkeys:Add, CheckBox, x300 y120 w60 h25 vUseWin, Win
-    Gui, CustomHotkeys:Add, Text, x20 y150 w150 h25, النافذة النشطة (اختياري):
+    Gui, CustomHotkeys:Add, Text, x20 y150 w180 h25, Active Window (optional):
     Gui, CustomHotkeys:Add, Edit, x180 y150 w300 h25 vWinCondition c000000 Background424242,
-    Gui, CustomHotkeys:Add, Button, x490 y150 w80 h25 gBrowseWinCondition, تصفح
-    Gui, CustomHotkeys:Add, Button, x20 y180 w150 h40 gAddAppHotkey, فتح تطبيق
-    Gui, CustomHotkeys:Add, Button, x20 y230 w150 h40 gOpenTextInput, إرسال نص
-    Gui, CustomHotkeys:Add, Button, x340 y180 w150 h40 gOpenFileHotkey, فتح ملف 
-    Gui, CustomHotkeys:Add, Button, x180 y180 w150 h40 gOpenFolderHotkey, فتح مجلد
-    Gui, CustomHotkeys:Add, Button, x180 y230 w150 h40 gOpenHotkeyManagerGUI, إدارة الاختصارات
-    Gui, CustomHotkeys:Tab, متقدم
-    Gui, CustomHotkeys:Add, Text, x20 y50 w610 h30 Center cFFD700, خيارات متقدمة
-    Gui, CustomHotkeys:Add, Text, x20 y75 w150 h50, زر الFlx (مثل SC056):
+    Gui, CustomHotkeys:Add, Button, x490 y150 w80 h25 gBrowseWinCondition, Browse
+    Gui, CustomHotkeys:Add, Button, x20 y180 w150 h40 gAddAppHotkey, Open App
+    Gui, CustomHotkeys:Add, Button, x20 y230 w150 h40 gOpenTextInput, Send Text
+    Gui, CustomHotkeys:Add, Button, x340 y180 w150 h40 gOpenFileHotkey, Open File
+    Gui, CustomHotkeys:Add, Button, x180 y180 w150 h40 gOpenFolderHotkey, Open Folder
+    Gui, CustomHotkeys:Add, Button, x180 y230 w150 h40 gOpenHotkeyManagerGUI, Manage Hotkeys
+    Gui, CustomHotkeys:Tab, Advanced
+    Gui, CustomHotkeys:Add, Text, x20 y50 w610 h30 Center cFFD700, Advanced Options
+    Gui, CustomHotkeys:Add, Text, x20 y75 w150 h50, Flx Key (e.g., SC056):
     Gui, CustomHotkeys:Add, Edit, x180 y90 w150 h25 vBaseHotkeyInput c000000 Background424242, %baseHotkey%
-    Gui, CustomHotkeys:Add, Button, x340 y90 w150 h25 gSaveBaseHotkey, حفظ زر الFlx
-    Gui, CustomHotkeys:Add, Text, x20 y110 w150 h50, المفتاح (مثل T) او اضغط اكتشاف:
+    Gui, CustomHotkeys:Add, Button, x340 y90 w150 h25 gSaveBaseHotkey, Save Flx Key
+    Gui, CustomHotkeys:Add, Text, x20 y110 w150 h50, Key (e.g., T) or press Detect:
     Gui, CustomHotkeys:Add, Edit, x180 y120 w150 h25 vAdvHotkeyKey c000000 Background424242,
-    Gui, CustomHotkeys:Add, Button, x340 y120 w100 h25 gDetectKey, اكتشاف المفتاح
-    Gui, CustomHotkeys:Add, Text, x450 y120 w190 h25 cA0A0A0, يمكن استخدام رموز مثل = أو , أيضاً
+    Gui, CustomHotkeys:Add, Button, x340 y120 w100 h25 gDetectKey, Detect Key
+    Gui, CustomHotkeys:Add, Text, x450 y120 w190 h50 cA0A0A0, Symbols like = or , can also be used
     Gui, CustomHotkeys:Add, CheckBox, x20 y150 w60 h25 vAdvUseFlx Checked, Flx
     Gui, CustomHotkeys:Add, CheckBox, x90 y150 w60 h25 vAdvUseCtrl, Ctrl
     Gui, CustomHotkeys:Add, CheckBox, x160 y150 w60 h25 vAdvUseShift, Shift
     Gui, CustomHotkeys:Add, CheckBox, x230 y150 w60 h25 vAdvUseAlt, Alt
     Gui, CustomHotkeys:Add, CheckBox, x300 y150 w60 h25 vAdvUseWin, Win
-    Gui, CustomHotkeys:Add, Text, x20 y180 w150 h25, النافذة النشطة (اختياري):
+    Gui, CustomHotkeys:Add, Text, x20 y180 w180 h25, Active Window (optional):
     Gui, CustomHotkeys:Add, Edit, x180 y180 w300 h25 vAdvWinCondition c000000 Background424242,
-    Gui, CustomHotkeys:Add, Button, x490 y180 w80 h25 gBrowseWinConditionAdv, تصفح
-    Gui, CustomHotkeys:Add, Text, x20 y210 w150 h25, السكربت (كود AHK كامل):
+    Gui, CustomHotkeys:Add, Button, x490 y180 w80 h25 gBrowseWinConditionAdv, Browse
+    Gui, CustomHotkeys:Add, Text, x20 y210 w150 h25, Script (full AHK code):
     Gui, CustomHotkeys:Add, Edit, x180 y210 w300 h80 vAdvHotkeyScript c000000 Background424242 Multi,
-    Gui, CustomHotkeys:Add, Button, x490 y210 w80 h25 gBrowseAdvAction, تصفح
-    Gui, CustomHotkeys:Add, Button, x180 y300 w100 h30 gAddAdvHotkey, إضافة
-    Gui, CustomHotkeys:Add, Button, x340 y300 w100 h30 gOpenHotkeyManagerGUI, إدارة الإختصارات
-    Gui, CustomHotkeys:Show, w650 h400, إدارة الاختصارات
+    Gui, CustomHotkeys:Add, Button, x490 y210 w80 h25 gBrowseAdvAction, Browse
+    Gui, CustomHotkeys:Add, Button, x180 y300 w100 h30 gAddAdvHotkey, Add
+    Gui, CustomHotkeys:Add, Button, x340 y300 w100 h30 gOpenHotkeyManagerGUI, Manage Hotkeys
+    Gui, CustomHotkeys:Show, w650 h400, Hotkey Manager
 }
 
 BrowseWinCondition:
 BrowseWinConditionAdv:
     Gui, CustomHotkeys:Submit, NoHide
-    MsgBox, 64, تعليمات, انقر على النافذة التي تريد اختيارها بعد الضغط على "موافق". سيتم إخفاء الواجهة مؤقتًا للسماح بالاختيار.
+    MsgBox, 64, Instructions, Click on the window you want to select after pressing "OK". The GUI will be temporarily hidden to allow selection.
     Gui, CustomHotkeys:Hide
     KeyWait, LButton, D T10
     if (ErrorLevel) {
-        MsgBox, 48, خطأ, لم يتم النقر على أي نافذة خلال 10 ثوانٍ.
+        MsgBox, 48, Error, No window was clicked within 10 seconds.
         Gui, CustomHotkeys:Show
         return
     }
@@ -469,7 +471,7 @@ BrowseWinConditionAdv:
             GuiControl, CustomHotkeys:, AdvWinCondition, %condition%
         }
     } else {
-        MsgBox, 48, خطأ, لم يتم العثور على عملية مرتبطة بالنافذة المختارة.
+        MsgBox, 48, Error, No process found associated with the selected window.
     }
     Gui, CustomHotkeys:Show
 return
@@ -478,14 +480,14 @@ SaveBaseHotkey:
     global baseHotkey, iniFile, CustomHotkeys, AdvancedScripts
     Gui, CustomHotkeys:Submit, NoHide
     if (BaseHotkeyInput = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح أساسي.
+        MsgBox, 48, Error, Please enter a base key.
         return
     }
     oldBaseHotkey := baseHotkey
     baseHotkey := BaseHotkeyInput
     IniWrite, %baseHotkey%, %iniFile%, HotkeySettings, BaseKey
     ReloadHotkeys(oldBaseHotkey)
-    MsgBox, 64, تم, تم تغيير زر الFlx إلى %baseHotkey% وإعادة تعريف الاختصارات بنجاح!
+    MsgBox, 64, Done, Flx key changed to %baseHotkey% and hotkeys redefined successfully!
 return
 
 ReloadHotkeys(oldBaseHotkey) {
@@ -497,7 +499,7 @@ ReloadHotkeys(oldBaseHotkey) {
         try {
             Hotkey, % oldBaseHotkey " & " . baseKey, Off
         } catch e {
-            ; تجاهل الأخطاء
+            ; Ignore errors
         }
     }
     for fullKey in AdvancedScripts {
@@ -507,7 +509,7 @@ ReloadHotkeys(oldBaseHotkey) {
         try {
             Hotkey, % oldBaseHotkey " & " . baseKey, Off
         } catch e {
-            ; تجاهل الأخطاء
+            ; Ignore errors
         }
     }
     for fullKey in CustomHotkeys {
@@ -517,7 +519,7 @@ ReloadHotkeys(oldBaseHotkey) {
         try {
             Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
         } catch e {
-            MsgBox, 48, خطأ, فشل تعريف الاختصار: %baseHotkey% & %baseKey%`nالسبب: %e%
+            MsgBox, 48, Error, Failed to define hotkey: %baseHotkey% & %baseKey%`nReason: %e%
         }
     }
     for fullKey in AdvancedScripts {
@@ -527,7 +529,7 @@ ReloadHotkeys(oldBaseHotkey) {
         try {
             Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
         } catch e {
-            MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+            MsgBox, 48, Error, Failed to define advanced script: %baseHotkey% & %baseKey%`nReason: %e%
         }
     }
     try {
@@ -536,7 +538,7 @@ ReloadHotkeys(oldBaseHotkey) {
         Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
         Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
     } catch e {
-        MsgBox, 48, خطأ, فشل إعادة تعريف الاختصارات الثابتة: %e%
+        MsgBox, 48, Error, Failed to redefine fixed hotkeys: %e%
     }
 }
 
@@ -575,7 +577,7 @@ DetectKey:
     }
     SetTimer, CheckKeyTimeout, Off
     if (detectedKey = "") {
-        MsgBox, 48, خطأ, لم يتم الضغط على أي مفتاح خلال 10 ثوانٍ.
+        MsgBox, 48, Error, No key was pressed within 10 seconds.
     } else {
         detectedKey := RegExReplace(detectedKey, "[+^!#]")
         GuiControl, CustomHotkeys:, AdvHotkeyKey, %detectedKey%
@@ -593,19 +595,19 @@ GenerateHotkeyList() {
     for fullKey, action in CustomHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := SplitKeyCond[1]
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
         hotkeyList .= key . " | " . winCondition . " = " . action . " (Flx)`n"
     }
     for fullKey, script in AdvancedScripts {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := SplitKeyCond[1]
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
         hotkeyList .= key . " | " . winCondition . " = " . script . " (Flx)`n"
     }
     for fullKey, action in NoFlxHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := SplitKeyCond[1]
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
         hotkeyList .= key . " | " . winCondition . " = " . action . " (NoFlx)`n"
     }
     return hotkeyList
@@ -614,7 +616,7 @@ GenerateHotkeyList() {
 AddAppHotkey:
     Gui, CustomHotkeys:Submit, NoHide
     if (HotkeyKey = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح.
+        MsgBox, 48, Error, Please enter a key.
         return
     }
     modifierPrefix := (UseFlx ? "" : "") . (UseCtrl ? "^" : "") . (UseShift ? "+" : "") . (UseAlt ? "!" : "") . (UseWin ? "#" : "")
@@ -622,29 +624,29 @@ AddAppHotkey:
     fullKey := key . (WinCondition ? "|" . WinCondition : "")
     if (UseFlx && (CustomHotkeys.HasKey(fullKey) || AdvancedScripts.HasKey(fullKey))) {
         oldAction := CustomHotkeys[fullKey] ? CustomHotkeys[fullKey] : AdvancedScripts[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     } else if (!UseFlx && NoFlxHotkeys.HasKey(fullKey)) {
         oldAction := NoFlxHotkeys[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     }
-    ; نافذة اختيار طريقة الإضافة
+    ; Window to choose how to add the app
     Gui, AppInput:Destroy
     Gui, AppInput:Color, 2D2D2D
     Gui, AppInput:Font, cFFFFFF s10, Segoe UI
-    Gui, AppInput:Add, Text, x20 y20 w300 h25, اختر طريقة إضافة التطبيق:
-    Gui, AppInput:Add, Button, x20 y50 w150 h30 gBrowseAppFile, اختيار ملف تطبيق
-    Gui, AppInput:Add, Button, x180 y50 w150 h30 gManualAppInput, إدخال أمر يدوي
-    Gui, AppInput:Add, Button, x100 y90 w100 h30 gCancelAppInput, إلغاء
-    Gui, AppInput:Show, w340 h130, إضافة تطبيق للاختصار
+    Gui, AppInput:Add, Text, x20 y20 w300 h25, Choose how to add the application:
+    Gui, AppInput:Add, Button, x20 y50 w150 h30 gBrowseAppFile, Select App File
+    Gui, AppInput:Add, Button, x180 y50 w150 h30 gManualAppInput, Enter Command Manually
+    Gui, AppInput:Add, Button, x100 y90 w100 h30 gCancelAppInput, Cancel
+    Gui, AppInput:Show, w340 h130, Add Application to Hotkey
 return
 
 BrowseAppFile:
     Gui, AppInput:Destroy
-    FileSelectFile, selectedFile, 3, , اختر تطبيقًا لفتحه, Executable Files (*.exe)
+    FileSelectFile, selectedFile, 3, , Select an application to open, Executable Files (*.exe)
     if (selectedFile != "") {
         Gui, CustomHotkeys:Submit, NoHide
         if (UseFlx) {
@@ -658,9 +660,9 @@ BrowseAppFile:
                 GuiControl, CustomHotkeys:, UseShift, 0
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار بنجاح!
+                MsgBox, 64, Done, Hotkey added successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار.
+                MsgBox, 48, Error, Failed to add hotkey.
             }
         } else {
             oldHotkeyCount := NoFlxHotkeys.Count()
@@ -673,9 +675,9 @@ BrowseAppFile:
                 GuiControl, CustomHotkeys:, UseShift, 0
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
+                MsgBox, 64, Done, Hotkey added without Flx successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
+                MsgBox, 48, Error, Failed to add hotkey without Flx.
             }
         }
     }
@@ -686,11 +688,11 @@ ManualAppInput:
     Gui, ManualInput:Destroy
     Gui, ManualInput:Color, 2D2D2D
     Gui, ManualInput:Font, cFFFFFF s10, Segoe UI
-    Gui, ManualInput:Add, Text, x20 y20 w300 h25, أدخل أمر التشغيل (مثل explorer.exe shell:...):
+    Gui, ManualInput:Add, Text, x20 y20 w300 h25, Enter the run command (e.g., explorer.exe shell:...):
     Gui, ManualInput:Add, Edit, x20 y50 w400 h25 vManualCommand c000000 Background424242,
-    Gui, ManualInput:Add, Button, x170 y80 w100 h30 gSaveManualCommand, حفظ
-    Gui, ManualInput:Add, Button, x280 y80 w100 h30 gCancelManualInput, إلغاء
-    Gui, ManualInput:Show, w440 h120, إدخال أمر يدوي
+    Gui, ManualInput:Add, Button, x170 y80 w100 h30 gSaveManualCommand, Save
+    Gui, ManualInput:Add, Button, x280 y80 w100 h30 gCancelManualInput, Cancel
+    Gui, ManualInput:Show, w440 h120, Manual Command Input
 return
 
 SaveManualCommand:
@@ -709,9 +711,9 @@ SaveManualCommand:
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
                 Gui, ManualInput:Destroy
-                MsgBox, 64, تم, تمت إضافة الاختصار بنجاح!
+                MsgBox, 64, Done, Hotkey added successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار.
+                MsgBox, 48, Error, Failed to add hotkey.
                 Gui, ManualInput:Destroy
             }
         } else {
@@ -726,14 +728,14 @@ SaveManualCommand:
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
                 Gui, ManualInput:Destroy
-                MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
+                MsgBox, 64, Done, Hotkey added without Flx successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
+                MsgBox, 48, Error, Failed to add hotkey without Flx.
                 Gui, ManualInput:Destroy
             }
         }
     } else {
-        MsgBox, 48, خطأ, يرجى إدخال أمر تشغيل.
+        MsgBox, 48, Error, Please enter a run command.
     }
 return
 
@@ -744,7 +746,7 @@ return
 CancelAppInput:
     Gui, AppInput:Destroy
 return
-    FileSelectFile, selectedFile, 3, , اختر تطبيقًا لفتحه, Executable Files (*.exe)
+    FileSelectFile, selectedFile, 3, , Select an application to open, Executable Files (*.exe)
     if (selectedFile != "") {
         if (UseFlx) {
             oldHotkeyCount := CustomHotkeys.Count()
@@ -757,9 +759,9 @@ return
                 GuiControl, CustomHotkeys:, UseShift, 0
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار بنجاح!
+                MsgBox, 64, Done, Hotkey added successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار.
+                MsgBox, 48, Error, Failed to add hotkey.
             }
         } else {
             oldHotkeyCount := NoFlxHotkeys.Count()
@@ -772,9 +774,9 @@ return
                 GuiControl, CustomHotkeys:, UseShift, 0
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
+                MsgBox, 64, Done, Hotkey added without Flx successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
+                MsgBox, 48, Error, Failed to add hotkey without Flx.
             }
         }
     }
@@ -783,7 +785,7 @@ return
 OpenTextInput:
     Gui, CustomHotkeys:Submit, NoHide
     if (HotkeyKey = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح.
+        MsgBox, 48, Error, Please enter a key.
         return
     }
     modifierPrefix := (UseFlx ? "" : "") . (UseCtrl ? "^" : "") . (UseShift ? "+" : "") . (UseAlt ? "!" : "") . (UseWin ? "#" : "")
@@ -791,24 +793,24 @@ OpenTextInput:
     fullKey := key . (WinCondition ? "|" . WinCondition : "")
     if (UseFlx && (CustomHotkeys.HasKey(fullKey) || AdvancedScripts.HasKey(fullKey))) {
         oldAction := CustomHotkeys[fullKey] ? CustomHotkeys[fullKey] : AdvancedScripts[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     } else if (!UseFlx && NoFlxHotkeys.HasKey(fullKey)) {
         oldAction := NoFlxHotkeys[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     }
     Gui, TextInput:Destroy
     Gui, TextInput:Color, 2D2D2D
     Gui, TextInput:Font, cFFFFFF s10, Segoe UI
-    Gui, TextInput:Add, Text, x20 y20 w150 h25, أدخل النص لإرساله:
+    Gui, TextInput:Add, Text, x20 y20 w150 h25, Enter text to send:
     Gui, TextInput:Add, Edit, x180 y20 w300 h25 vTextToSend c000000 Background424242,
-    Gui, TextInput:Add, Text, x20 y50 w460 h20 cA0A0A0, ملاحظة: يمكنك أيضًا إدخال إيموجي مثل 😊 أو 👍 هنا
-    Gui, TextInput:Add, Button, x180 y80 w100 h30 gSaveTextHotkey, حفظ
-    Gui, TextInput:Add, Button, x290 y80 w100 h30 gCancelTextInput, إلغاء
-    Gui, TextInput:Show, w500 h120, إرسال نص للاختصار
+    Gui, TextInput:Add, Text, x20 y50 w460 h20 cA0A0A0, Note: You can also enter emojis like 😊 or 👍 here
+    Gui, TextInput:Add, Button, x180 y80 w100 h30 gSaveTextHotkey, Save
+    Gui, TextInput:Add, Button, x290 y80 w100 h30 gCancelTextInput, Cancel
+    Gui, TextInput:Show, w500 h120, Send Text for Hotkey
 return
 
 SaveTextHotkey:
@@ -828,9 +830,9 @@ SaveTextHotkey:
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
                 Gui, TextInput:Destroy
-                MsgBox, 64, تم, تمت إضافة الاختصار بنجاح!
+                MsgBox, 64, Done, Hotkey added successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار.
+                MsgBox, 48, Error, Failed to add hotkey.
                 Gui, TextInput:Destroy
             }
         } else {
@@ -846,14 +848,14 @@ SaveTextHotkey:
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
                 Gui, TextInput:Destroy
-                MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
+                MsgBox, 64, Done, Hotkey added without Flx successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
+                MsgBox, 48, Error, Failed to add hotkey without Flx.
                 Gui, TextInput:Destroy
             }
         }
     } else {
-        MsgBox, 48, خطأ, يرجى إدخال نص.
+        MsgBox, 48, Error, Please enter text.
         Gui, TextInput:Destroy
     }
 return
@@ -865,7 +867,7 @@ return
 OpenFileHotkey:
     Gui, CustomHotkeys:Submit, NoHide
     if (HotkeyKey = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح.
+        MsgBox, 48, Error, Please enter a key.
         return
     }
     modifierPrefix := (UseFlx ? "" : "") . (UseCtrl ? "^" : "") . (UseShift ? "+" : "") . (UseAlt ? "!" : "") . (UseWin ? "#" : "")
@@ -873,16 +875,16 @@ OpenFileHotkey:
     fullKey := key . (WinCondition ? "|" . WinCondition : "")
     if (UseFlx && (CustomHotkeys.HasKey(fullKey) || AdvancedScripts.HasKey(fullKey))) {
         oldAction := CustomHotkeys[fullKey] ? CustomHotkeys[fullKey] : AdvancedScripts[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     } else if (!UseFlx && NoFlxHotkeys.HasKey(fullKey)) {
         oldAction := NoFlxHotkeys[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     }
-    FileSelectFile, selectedFile, 3, , اختر ملفًا لفتحه, All Files (*.*)
+    FileSelectFile, selectedFile, 3, , Select a file to open, All Files (*.*)
     if (selectedFile != "") {
         if (UseFlx) {
             oldHotkeyCount := CustomHotkeys.Count()
@@ -895,9 +897,9 @@ OpenFileHotkey:
                 GuiControl, CustomHotkeys:, UseShift, 0
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار لفتح الملف بنجاح!
+                MsgBox, 64, Done, Hotkey added to open file successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار.
+                MsgBox, 48, Error, Failed to add hotkey.
             }
         } else {
             oldHotkeyCount := NoFlxHotkeys.Count()
@@ -910,9 +912,9 @@ OpenFileHotkey:
                 GuiControl, CustomHotkeys:, UseShift, 0
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx لفتح الملف بنجاح!
+                MsgBox, 64, Done, Hotkey added without Flx to open file successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
+                MsgBox, 48, Error, Failed to add hotkey without Flx.
             }
         }
     }
@@ -921,7 +923,7 @@ return
 OpenFolderHotkey:
     Gui, CustomHotkeys:Submit, NoHide
     if (HotkeyKey = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح.
+        MsgBox, 48, Error, Please enter a key.
         return
     }
     modifierPrefix := (UseFlx ? "" : "") . (UseCtrl ? "^" : "") . (UseShift ? "+" : "") . (UseAlt ? "!" : "") . (UseWin ? "#" : "")
@@ -929,29 +931,29 @@ OpenFolderHotkey:
     fullKey := key . (WinCondition ? "|" . WinCondition : "")
     if (UseFlx && (CustomHotkeys.HasKey(fullKey) || AdvancedScripts.HasKey(fullKey))) {
         oldAction := CustomHotkeys[fullKey] ? CustomHotkeys[fullKey] : AdvancedScripts[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     } else if (!UseFlx && NoFlxHotkeys.HasKey(fullKey)) {
         oldAction := NoFlxHotkeys[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %WinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %WinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     }
     Gui, FolderInput:Destroy
     Gui, FolderInput:Color, 2D2D2D
     Gui, FolderInput:Font, cFFFFFF s10, Segoe UI
-    Gui, FolderInput:Add, Text, x20 y20 w150 h25, أدخل مسار المجلد:
+    Gui, FolderInput:Add, Text, x20 y20 w150 h25, Enter folder path:
     Gui, FolderInput:Add, Edit, x180 y20 w300 h25 vFolderPath c000000 Background424242,
-    Gui, FolderInput:Add, Button, x490 y20 w80 h25 gBrowseFolder, تصفح
-    Gui, FolderInput:Add, Button, x180 y60 w100 h30 gSaveFolderHotkey, حفظ
-    Gui, FolderInput:Add, Button, x290 y60 w100 h30 gCancelFolderInput, إلغاء
-    Gui, FolderInput:Show, w600 h100, فتح مجلد للاختصار
+    Gui, FolderInput:Add, Button, x490 y20 w80 h25 gBrowseFolder, Browse
+    Gui, FolderInput:Add, Button, x180 y60 w100 h30 gSaveFolderHotkey, Save
+    Gui, FolderInput:Add, Button, x290 y60 w100 h30 gCancelFolderInput, Cancel
+    Gui, FolderInput:Show, w600 h100, Open Folder for Hotkey
 return
 
 BrowseFolder:
     Gui, FolderInput:Submit, NoHide
-    FileSelectFolder, selectedFolder, , 3, اختر مجلدًا لفتحه
+    FileSelectFolder, selectedFolder, , 3, Select a folder to open
     if (selectedFolder != "") {
         GuiControl, FolderInput:, FolderPath, %selectedFolder%
     }
@@ -974,9 +976,9 @@ SaveFolderHotkey:
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
                 Gui, FolderInput:Destroy
-                MsgBox, 64, تم, تمت إضافة الاختصار بنجاح!
+                MsgBox, 64, Done, Hotkey added successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار.
+                MsgBox, 48, Error, Failed to add hotkey.
                 Gui, FolderInput:Destroy
             }
         } else {
@@ -992,14 +994,14 @@ SaveFolderHotkey:
                 GuiControl, CustomHotkeys:, UseAlt, 0
                 GuiControl, CustomHotkeys:, UseWin, 0
                 Gui, FolderInput:Destroy
-                MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
+                MsgBox, 64, Done, Hotkey added without Flx successfully!
             } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
+                MsgBox, 48, Error, Failed to add hotkey without Flx.
                 Gui, FolderInput:Destroy
             }
         }
     } else {
-        MsgBox, 48, خطأ, يرجى إدخال مسار مجلد أو اختيار واحد.
+        MsgBox, 48, Error, Please enter a folder path or select one.
         Gui, FolderInput:Destroy
     }
 return
@@ -1011,7 +1013,7 @@ AddAdvHotkey:
     global AdvancedScripts
     Gui, CustomHotkeys:Submit, NoHide
     if (AdvHotkeyKey = "" || AdvHotkeyScript = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح وسكربت.
+        MsgBox, 48, Error, Please enter a key and script.
         return
     }
     modifierPrefix := (AdvUseFlx ? "" : "") . (AdvUseCtrl ? "^" : "") . (AdvUseShift ? "+" : "") . (AdvUseAlt ? "!" : "") . (AdvUseWin ? "#" : "")
@@ -1026,12 +1028,12 @@ AddAdvHotkey:
     }
     if (AdvUseFlx && (CustomHotkeys.HasKey(fullKey) || AdvancedScripts.HasKey(fullKey))) {
         oldAction := CustomHotkeys[fullKey] ? CustomHotkeys[fullKey] : AdvancedScripts[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %AdvWinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %AdvWinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     } else if (!AdvUseFlx && NoFlxHotkeys.HasKey(fullKey)) {
         oldAction := NoFlxHotkeys[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %AdvWinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %AdvWinCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
     }
@@ -1046,8 +1048,8 @@ AddAdvHotkey:
             GuiControl, CustomHotkeys:, AdvUseShift, 0
             GuiControl, CustomHotkeys:, AdvUseAlt, 0
             GuiControl, CustomHotkeys:, AdvUseWin, 0
-            actionText := isEdit ? "تعديل" : "إضافة"
-            MsgBox, 64, تم, تمت %actionText% السكربت المتقدم بنجاح!
+            actionText := isEdit ? "edit" : "addition"
+            MsgBox, 64, Done, Advanced script %actionText% completed successfully!
         }
     } else {
         oldHotkeyCount := NoFlxHotkeys.Count()
@@ -1061,16 +1063,16 @@ AddAdvHotkey:
             GuiControl, CustomHotkeys:, AdvUseShift, 0
             GuiControl, CustomHotkeys:, AdvUseAlt, 0
             GuiControl, CustomHotkeys:, AdvUseWin, 0
-            MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
+            MsgBox, 64, Done, Hotkey added without Flx successfully!
         } else {
-            MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
+            MsgBox, 48, Error, Failed to add hotkey without Flx.
         }
     }
 return
 
 BrowseAdvAction:
     Gui, CustomHotkeys:Submit, NoHide
-    FileSelectFile, selectedFile, 3, , اختر ملف سكربت AHK, AutoHotkey Scripts (*.ahk)
+    FileSelectFile, selectedFile, 3, , Select an AHK script file, AutoHotkey Scripts (*.ahk)
     if (selectedFile != "") {
         FileRead, scriptContent, %selectedFile%
         GuiControl, CustomHotkeys:, AdvHotkeyScript, %scriptContent%
@@ -1082,36 +1084,36 @@ OpenHotkeyManagerGUI:
     Gui, HotkeyManager:Destroy
     Gui, HotkeyManager:Color, 2D2D2D
     Gui, HotkeyManager:Font, cFFFFFF s10, Segoe UI
-    Gui, HotkeyManager:Add, Text, x20 y20 w540 h25, قائمة الاختصارات:
+    Gui, HotkeyManager:Add, Text, x20 y20 w540 h25, Hotkey List:
     Gui, HotkeyManager:Add, Edit, x20 y50 w440 h25 vSearchTerm gSearchHotkeys c000000 Background424242,
-    Gui, HotkeyManager:Add, Button, x470 y50 w90 h25 gSearchHotkeys, بحث
-    Gui, HotkeyManager:Add, ListView, x20 y80 w540 h200 vHotkeyList gHotkeyListEvent -Multi +Grid +LV0x10000 Background2D2D2D, المفتاح|النافذة|الإجراء|النوع
-    Gui, HotkeyManager:Add, Button, x130 y290 w100 h30 gDeleteSelectedHotkeys, حذف المحدد
-    Gui, HotkeyManager:Add, Button, x260 y290 w100 h30 gEditSelectedHotkey, تعديل
-    Gui, HotkeyManager:Add, Button, x390 y290 w100 h30 gCancelHotkeyManager, إلغاء
+    Gui, HotkeyManager:Add, Button, x470 y50 w90 h25 gSearchHotkeys, Search
+    Gui, HotkeyManager:Add, ListView, x20 y80 w540 h200 vHotkeyList gHotkeyListEvent -Multi +Grid +LV0x10000 Background2D2D2D, Key|Window|Action|Type
+    Gui, HotkeyManager:Add, Button, x130 y290 w100 h30 gDeleteSelectedHotkeys, Delete Selected
+    Gui, HotkeyManager:Add, Button, x260 y290 w100 h30 gEditSelectedHotkey, Edit
+    Gui, HotkeyManager:Add, Button, x390 y290 w100 h30 gCancelHotkeyManager, Cancel
     for fullKey, action in CustomHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
-        LV_Add("", key, winCondition, action, "بسيط (Flx)")
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
+        LV_Add("", key, winCondition, action, "Simple (Flx)")
     }
     for fullKey, script in AdvancedScripts {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
-        LV_Add("", key, winCondition, script, "متقدم (Flx)")
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
+        LV_Add("", key, winCondition, script, "Advanced (Flx)")
     }
     for fullKey, action in NoFlxHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
-        LV_Add("", key, winCondition, action, "بسيط (NoFlx)")
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
+        LV_Add("", key, winCondition, action, "Simple (NoFlx)")
     }
     LV_ModifyCol(1, 50)
     LV_ModifyCol(2, 100)
     LV_ModifyCol(3, 340)
     LV_ModifyCol(4, 50)
-    Gui, HotkeyManager:Show, w650 h330, إدارة الاختصارات
+    Gui, HotkeyManager:Show, w650 h330, Hotkey Manager
 return
 
 CancelHotkeyManager:
@@ -1124,25 +1126,25 @@ SearchHotkeys:
     for fullKey, action in CustomHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
         if (SearchTerm = "" || InStr(key, SearchTerm) || InStr(winCondition, SearchTerm) || InStr(action, SearchTerm)) {
-            LV_Add("", key, winCondition, action, "بسيط (Flx)")
+            LV_Add("", key, winCondition, action, "Simple (Flx)")
         }
     }
     for fullKey, script in AdvancedScripts {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
         if (SearchTerm = "" || InStr(key, SearchTerm) || InStr(winCondition, SearchTerm) || InStr(script, SearchTerm)) {
-            LV_Add("", key, winCondition, script, "متقدم (Flx)")
+            LV_Add("", key, winCondition, script, "Advanced (Flx)")
         }
     }
     for fullKey, action in NoFlxHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "Not specified"
         if (SearchTerm = "" || InStr(key, SearchTerm) || InStr(winCondition, SearchTerm) || InStr(action, SearchTerm)) {
-            LV_Add("", key, winCondition, action, "بسيط (NoFlx)")
+            LV_Add("", key, winCondition, action, "Simple (NoFlx)")
         }
     }
     LV_ModifyCol(1, 50)
@@ -1158,18 +1160,18 @@ HotkeyListEvent:
             LV_GetText(selectedKey, row, 1)
             LV_GetText(selectedWinCondition, row, 2)
             LV_GetText(type, row, 4)
-            fullSelectedKey := StrReplace(selectedKey, ";", "VKBA") . (selectedWinCondition != "غير محدد" ? "|" . selectedWinCondition : "")
+            fullSelectedKey := StrReplace(selectedKey, ";", "VKBA") . (selectedWinCondition != "Not specified" ? "|" . selectedWinCondition : "")
             Gosub, EditSelectedHotkey
         }
     }
 return
 
 DeleteFromEditHotkey:
-    MsgBox, 4, تأكيد, هل تريد حذف الاختصار "%selectedKey%" مع شرط النافذة "%selectedWinCondition%"؟
+    MsgBox, 4, Confirmation, Do you want to delete the hotkey "%selectedKey%" with window condition "%selectedWinCondition%"?
     IfMsgBox, Yes
     {
         if (InStr(type, "Flx")) {
-            if (InStr(type, "بسيط")) {
+            if (InStr(type, "Simple")) {
                 DeleteHotkeyAction(fullSelectedKey)
             } else {
                 DeleteAdvancedScript(fullSelectedKey)
@@ -1179,40 +1181,40 @@ DeleteFromEditHotkey:
         }
         Gui, EditHotkey:Destroy
         Gosub, OpenHotkeyManagerGUI
-        MsgBox, 64, تم, تم حذف الاختصار بنجاح!
+        MsgBox, 64, Done, Hotkey deleted successfully!
     }
 return
 
 EditSelectedHotkey:
     row := LV_GetNext(0)
     if (!row) {
-        MsgBox, 48, خطأ, يرجى تحديد اختصار لتعديله.
+        MsgBox, 48, Error, Please select a hotkey to edit.
         return
     }
     LV_GetText(selectedKey, row, 1)
     LV_GetText(selectedWinCondition, row, 2)
     LV_GetText(actionOrScript, row, 3)
     LV_GetText(type, row, 4)
-    fullSelectedKey := StrReplace(selectedKey, ";", "VKBA") . (selectedWinCondition != "غير محدد" ? "|" . selectedWinCondition : "")
+    fullSelectedKey := StrReplace(selectedKey, ";", "VKBA") . (selectedWinCondition != "Not specified" ? "|" . selectedWinCondition : "")
     baseKey := RegExReplace(selectedKey, "[+^!#]")
     Gui, EditHotkey:Destroy
     Gui, EditHotkey:Color, 2D2D2D
     Gui, EditHotkey:Font, cFFFFFF s10, Segoe UI
-    Gui, EditHotkey:Add, Text, x20 y20 w150 h25, المفتاح:
+    Gui, EditHotkey:Add, Text, x20 y20 w150 h25, Key:
     Gui, EditHotkey:Add, Edit, x180 y20 w150 h25 vNewKey c000000 Background424242, %baseKey%
     Gui, EditHotkey:Add, CheckBox, x20 y50 w60 h25 vUseFlx Checked, Flx
     Gui, EditHotkey:Add, CheckBox, x90 y50 w60 h25 vUseCtrl, Ctrl
     Gui, EditHotkey:Add, CheckBox, x160 y50 w60 h25 vUseShift, Shift
     Gui, EditHotkey:Add, CheckBox, x230 y50 w60 h25 vUseAlt, Alt
     Gui, EditHotkey:Add, CheckBox, x300 y50 w60 h25 vUseWin, Win
-    Gui, EditHotkey:Add, Text, x20 y80 w150 h25, النافذة النشطة (اختياري):
-    Gui, EditHotkey:Add, Edit, x180 y80 w300 h25 vNewWinCondition c000000 Background424242, % (selectedWinCondition != "غير محدد" ? selectedWinCondition : "")
-    Gui, EditHotkey:Add, Button, x490 y80 w80 h25 gBrowseWinConditionEdit, تصفح
-    if (InStr(type, "بسيط")) {
-        Gui, EditHotkey:Add, Text, x20 y110 w150 h25, الإجراء:
+    Gui, EditHotkey:Add, Text, x20 y80 w180 h25, Active Window (optional):
+    Gui, EditHotkey:Add, Edit, x180 y80 w300 h25 vNewWinCondition c000000 Background424242, % (selectedWinCondition != "Not specified" ? selectedWinCondition : "")
+    Gui, EditHotkey:Add, Button, x490 y80 w80 h25 gBrowseWinConditionEdit, Browse
+    if (InStr(type, "Simple")) {
+        Gui, EditHotkey:Add, Text, x20 y110 w150 h25, Action:
         Gui, EditHotkey:Add, Edit, x180 y110 w300 h25 vNewAction c000000 Background424242, %actionOrScript%
     } else {
-        Gui, EditHotkey:Add, Text, x20 y110 w150 h25, السكربت:
+        Gui, EditHotkey:Add, Text, x20 y110 w150 h25, Script:
         Gui, EditHotkey:Add, Edit, x180 y110 w300 h100 vNewAction c000000 Background424242 Multi, %actionOrScript%
         fullPath := A_ScriptDir "\" actionOrScript
         if FileExist(fullPath) {
@@ -1220,11 +1222,11 @@ EditSelectedHotkey:
             GuiControl, EditHotkey:, NewAction, %scriptContent%
         }
     }
-    Gui, EditHotkey:Add, Button, x180 y230 w100 h30 gSaveEditedHotkey, حفظ
-    Gui, EditHotkey:Add, Button, x290 y230 w100 h30 gCancelEditHotkey, إلغاء
-    Gui, EditHotkey:Add, Button, x400 y230 w100 h30 gDeleteFromEditHotkey, حذف
-    if (InStr(type, "متقدم")) {
-        Gui, EditHotkey:Add, Button, x180 y270 w100 h30 gOpenScriptLocation, فتح الموقع
+    Gui, EditHotkey:Add, Button, x180 y230 w100 h30 gSaveEditedHotkey, Save
+    Gui, EditHotkey:Add, Button, x290 y230 w100 h30 gCancelEditHotkey, Cancel
+    Gui, EditHotkey:Add, Button, x400 y230 w100 h30 gDeleteFromEditHotkey, Delete
+    if (InStr(type, "Advanced")) {
+        Gui, EditHotkey:Add, Button, x180 y270 w100 h30 gOpenScriptLocation, Open Location
     }
     if (InStr(fullSelectedKey, "^"))
         GuiControl, EditHotkey:, UseCtrl, 1
@@ -1236,16 +1238,16 @@ EditSelectedHotkey:
         GuiControl, EditHotkey:, UseWin, 1
     if (!InStr(type, "Flx"))
         GuiControl, EditHotkey:, UseFlx, 0
-    Gui, EditHotkey:Show, w510 h310, تعديل الاختصار
+    Gui, EditHotkey:Show, w510 h310, Edit Hotkey
 return
 
 BrowseWinConditionEdit:
     Gui, EditHotkey:Submit, NoHide
-    MsgBox, 64, تعليمات, انقر على النافذة التي تريد اختيارها بعد الضغط على "موافق". سيتم إخفاء الواجهة مؤقتًا للسماح بالاختيار.
+    MsgBox, 64, Instructions, Click on the window you want to select after pressing "OK". The GUI will be temporarily hidden to allow selection.
     Gui, EditHotkey:Hide
     KeyWait, LButton, D T10
     if (ErrorLevel) {
-        MsgBox, 48, خطأ, لم يتم النقر على أي نافذة خلال 10 ثوانٍ.
+        MsgBox, 48, Error, No window was clicked within 10 seconds.
         Gui, EditHotkey:Show
         return
     }
@@ -1255,7 +1257,7 @@ BrowseWinConditionEdit:
         condition := "ahk_exe " . activeExe
         GuiControl, EditHotkey:, NewWinCondition, %condition%
     } else {
-        MsgBox, 48, خطأ, لم يتم العثور على عملية مرتبطة بالنافذة المختارة.
+        MsgBox, 48, Error, No process found associated with the selected window.
     }
     Gui, EditHotkey:Show
 return
@@ -1268,14 +1270,14 @@ OpenScriptLocation:
         SplitPath, fullPath,, dir
         Run, explorer.exe "%dir%"
     } else {
-        MsgBox, 48, خطأ, لا يمكن العثور على موقع السكربت.
+        MsgBox, 48, Error, Cannot find script location.
     }
 return
 
 SaveEditedHotkey:
     Gui, EditHotkey:Submit
     if (NewKey = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح.
+        MsgBox, 48, Error, Please enter a key.
         Gui, EditHotkey:Destroy
         return
     }
@@ -1285,18 +1287,18 @@ SaveEditedHotkey:
     if (fullNewKey != fullSelectedKey) {
         if (UseFlx && (CustomHotkeys.HasKey(fullNewKey) || AdvancedScripts.HasKey(fullNewKey))) {
             oldAction := CustomHotkeys[fullNewKey] ? CustomHotkeys[fullNewKey] : AdvancedScripts[fullNewKey]
-            MsgBox, 4, تحذير, المفتاح %fullNewKey% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+            MsgBox, 4, Warning, The key %fullNewKey% is already in use:`n%oldAction%`nDo you want to replace it?
             IfMsgBox, No
                 return
         } else if (!UseFlx && NoFlxHotkeys.HasKey(fullNewKey)) {
             oldAction := NoFlxHotkeys[fullNewKey]
-            MsgBox, 4, تحذير, المفتاح %fullNewKey% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+            MsgBox, 4, Warning, The key %fullNewKey% is already in use:`n%oldAction%`nDo you want to replace it?
             IfMsgBox, No
                 return
         }
     }
     if (InStr(type, "Flx")) {
-        if (InStr(type, "بسيط")) {
+        if (InStr(type, "Simple")) {
             DeleteHotkeyAction(fullSelectedKey)
             if (UseFlx) {
                 AddHotkey(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin, UseFlx, NewWinCondition)
@@ -1314,7 +1316,7 @@ SaveEditedHotkey:
     } else {
         DeleteNoFlxHotkey(fullSelectedKey)
         if (UseFlx) {
-            if (InStr(type, "بسيط")) {
+            if (InStr(type, "Simple")) {
                 AddHotkey(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin, UseFlx, NewWinCondition)
             } else {
                 AddAdvancedScript(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin,, NewWinCondition)
@@ -1325,7 +1327,7 @@ SaveEditedHotkey:
     }
     Gui, EditHotkey:Destroy
     Gosub, OpenHotkeyManagerGUI
-    MsgBox, 64, تم, تم تعديل الاختصار بنجاح!
+    MsgBox, 64, Done, Hotkey edited successfully!
 return
 
 CancelEditHotkey:
@@ -1341,20 +1343,20 @@ DeleteSelectedHotkeys:
         LV_GetText(key, row, 1)
         LV_GetText(winCondition, row, 2)
         LV_GetText(type, row, 4)
-        fullKey := StrReplace(key, ";", "VKBA") . (winCondition != "غير محدد" ? "|" . winCondition : "")
+        fullKey := StrReplace(key, ";", "VKBA") . (winCondition != "Not specified" ? "|" . winCondition : "")
         selectedRows.Push({Key: fullKey, Type: type})
     }
     count := selectedRows.Length()
     if (count = 0) {
-        MsgBox, 48, خطأ, يرجى تحديد اختصار واحد على الأقل.
+        MsgBox, 48, Error, Please select at least one hotkey.
         return
     }
-    MsgBox, 4, تأكيد, هل تريد حذف %count% عناصر محددة؟
+    MsgBox, 4, Confirmation, Do you want to delete %count% selected items?
     IfMsgBox, Yes
     {
         for index, item in selectedRows {
             if (InStr(item.Type, "Flx")) {
-                if (InStr(item.Type, "بسيط")) {
+                if (InStr(item.Type, "Simple")) {
                     DeleteHotkeyAction(item.Key)
                 } else {
                     DeleteAdvancedScript(item.Key)
@@ -1364,7 +1366,7 @@ DeleteSelectedHotkeys:
             }
         }
         Gosub, OpenHotkeyManagerGUI
-        MsgBox, 64, تم, تم حذف العناصر المحددة بنجاح!
+        MsgBox, 64, Done, Selected items deleted successfully!
     }
 return
 
@@ -1378,7 +1380,7 @@ DeleteHotkeyAction(fullKey) {
     try {
         Hotkey, % baseHotkey " & " . baseKey, Off
     } catch e {
-        ; تجاهل الأخطاء إذا لم يكن الاختصار معرفًا
+        ; Ignore errors if hotkey isn’t defined
     }
 }
 
@@ -1397,7 +1399,7 @@ DeleteAdvancedScript(fullKey) {
     try {
         Hotkey, % baseHotkey " & " . baseKey, Off
     } catch e {
-        ; تجاهل الأخطاء
+        ; Ignore errors
     }
 }
 
@@ -1410,7 +1412,7 @@ DeleteNoFlxHotkey(fullKey) {
     try {
         Hotkey, %key%, Off
     } catch e {
-        ; تجاهل الأخطاء
+        ; Ignore errors
     }
 }
 
@@ -1425,13 +1427,13 @@ AddHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 0, us
     fullKey := modifierPrefix . key . (winCondition ? "|" . winCondition : "")
     if (CustomHotkeys.HasKey(fullKey)) {
         oldAction := CustomHotkeys[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %winCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %winCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
         DeleteHotkeyAction(fullKey)
     } else if (AdvancedScripts.HasKey(fullKey)) {
         oldScript := AdvancedScripts[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %winCondition% مستخدم بالفعل كسكربت متقدم:`n%oldScript%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %winCondition% is already in use as an advanced script:`n%oldScript%`nDo you want to replace it?
         IfMsgBox, No
             return
         DeleteAdvancedScript(fullKey)
@@ -1442,7 +1444,7 @@ AddHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 0, us
     try {
         Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
     } catch e {
-        MsgBox, 48, خطأ, فشل تعريف الاختصار: %baseHotkey% & %baseKey%`nالسبب: %e%
+        MsgBox, 48, Error, Failed to define hotkey: %baseHotkey% & %baseKey%`nReason: %e%
     }
 }
 
@@ -1456,7 +1458,7 @@ AddAdvancedScript(key, script, useCtrl := 0, useShift := 0, useAlt := 0, useWin 
     modifierPrefix := (useCtrl ? "^" : "") . (useShift ? "+" : "") . (useAlt ? "!" : "") . (useWin ? "#" : "")
     fullKey := modifierPrefix . key . (winCondition ? "|" . winCondition : "")
     defaultValue := defaultName ? defaultName : key
-    InputBox, scriptName, إدخال اسم السكربت, أدخل اسمًا للسكربت (بدون .ahk):,, 300, 150,,,, %defaultValue%
+    InputBox, scriptName, Enter Script Name, Enter a name for the script (without .ahk):,, 300, 150,,,, %defaultValue%
     if (ErrorLevel || scriptName = "") {
         return 0
     }
@@ -1467,14 +1469,14 @@ AddAdvancedScript(key, script, useCtrl := 0, useShift := 0, useAlt := 0, useWin 
     fullScriptPath := scriptsDir "\" scriptName
     for existingKey, existingPath in AdvancedScripts {
         if (existingPath = scriptPath && existingKey != fullKey) {
-            MsgBox, 48, خطأ, اسم السكربت %scriptName% مستخدم بالفعل لاختصار آخر.`nيرجى اختيار اسم مختلف.
+            MsgBox, 48, Error, The script name %scriptName% is already in use for another hotkey.`nPlease choose a different name.
             return 0
         }
     }
     FileDelete, %fullScriptPath%
     FileAppend, %script%, %fullScriptPath%, UTF-8
     if (ErrorLevel) {
-        MsgBox, 48, خطأ, فشل حفظ السكربت في: %fullScriptPath%
+        MsgBox, 48, Error, Failed to save script to: %fullScriptPath%
         return 0
     }
     if (AdvancedScripts.HasKey(fullKey)) {
@@ -1490,7 +1492,7 @@ AddAdvancedScript(key, script, useCtrl := 0, useShift := 0, useAlt := 0, useWin 
     try {
         Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
     } catch e {
-        MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+        MsgBox, 48, Error, Failed to define advanced script: %baseHotkey% & %baseKey%`nReason: %e%
         return 0
     }
     return 1
@@ -1507,7 +1509,7 @@ AddNoFlxHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 
     fullKey := modifierPrefix . key . (winCondition ? "|" . winCondition : "")
     if (NoFlxHotkeys.HasKey(fullKey)) {
         oldAction := NoFlxHotkeys[fullKey]
-        MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %winCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
+        MsgBox, 4, Warning, The key %key% with window condition %winCondition% is already in use:`n%oldAction%`nDo you want to replace it?
         IfMsgBox, No
             return
         DeleteNoFlxHotkey(fullKey)
@@ -1517,7 +1519,7 @@ AddNoFlxHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 
     try {
         Hotkey, % modifierPrefix . key, ExecuteNoFlxHotkey, On
     } catch e {
-        MsgBox, 48, خطأ, فشل تعريف الاختصار بدون Flx: %fullKey%`nالسبب: %e%
+        MsgBox, 48, Error, Failed to define hotkey without Flx: %fullKey%`nReason: %e%
     }
 }
 
@@ -1542,10 +1544,10 @@ ExecuteHotkey:
             Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
             SetWorkingDir, %A_ScriptDir%
             if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
+                MsgBox, 48, Error, Failed to run script: %fullPath%`nError: %A_LastError%
             }
         } else {
-            MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
+            MsgBox, 48, Error, Script file not found: %fullPath%
         }
     }
     else if (AdvancedScripts.HasKey(fullKeyDefault)) {
@@ -1556,10 +1558,10 @@ ExecuteHotkey:
             Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
             SetWorkingDir, %A_ScriptDir%
             if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
+                MsgBox, 48, Error, Failed to run script: %fullPath%`nError: %A_LastError%
             }
         } else {
-            MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
+            MsgBox, 48, Error, Script file not found: %fullPath%
         }
     }
     else if (CustomHotkeys.HasKey(fullKeyWithCondition)) {
@@ -1594,35 +1596,35 @@ ExecuteSingleAction(action) {
     if (InStr(action, "Run ") = 1) {
         command := Trim(SubStr(action, 5))
         
-        ; استخراج اسم العملية أو المسار للتحقق منه
+        ; Extract process name or path for checking
         SplitPath, command, fileName, dir
-        if (fileName = "") {  ; إذا كان المسار مجلدًا فقط
-            ; تشغيل المجلد مباشرة بدون تحقق
+        if (fileName = "") {  ; If it’s only a folder path
+            ; Open the folder directly without checking
             Run, explorer.exe "%command%", , UseErrorLevel
             if (A_LastError) {
-                MsgBox, 48, خطأ, فشل فتح المجلد: %command%`nخطأ: %A_LastError%
+                MsgBox, 48, Error, Failed to open folder: %command%`nError: %A_LastError%
             }
             return
-        } else {  ; إذا كان ملفًا (مثل تطبيق)
+        } else {  ; If it’s a file (like an application)
             targetPath := fileName
         }
 
-        ; التعامل مع التطبيقات فقط
+        ; Handle applications only
         WinGet, activePath, ProcessName, A
         WinGet, activeID, ID, A
-        if (activePath = targetPath) {  ; إذا كان التطبيق نشطاً
+        if (activePath = targetPath) {  ; If the application is active
             WinMinimize, ahk_id %activeID%
             return
         } else {
             WinGet, processList, List, ahk_exe %targetPath%
-            if (processList > 0) {  ; إذا كان التطبيق مفتوحاً
+            if (processList > 0) {  ; If the application is open
                 Loop, %processList% {
                     thisID := processList%A_Index%
                     WinGet, thisState, MinMax, ahk_id %thisID%
-                    if (thisState != -1) {  ; إذا لم يكن مصغراً
+                    if (thisState != -1) {  ; If it’s not minimized
                         WinMinimize, ahk_id %thisID%
                         return
-                    } else {  ; إذا كان مصغراً
+                    } else {  ; If it’s minimized
                         WinRestore, ahk_id %thisID%
                         WinActivate, ahk_id %thisID%
                         return
@@ -1631,10 +1633,10 @@ ExecuteSingleAction(action) {
             }
         }
 
-        ; إذا لم يكن التطبيق مفتوحاً، شغله
+        ; If the application isn’t open, run it
         Run, %command%, , UseErrorLevel
         if (A_LastError) {
-            MsgBox, 48, خطأ, فشل تشغيل: %command%`nخطأ: %A_LastError%
+            MsgBox, 48, Error, Failed to run: %command%`nError: %A_LastError%
         }
     } else if (InStr(action, "Send ") = 1) {
         command := Trim(SubStr(action, 6))
@@ -1649,10 +1651,10 @@ ExecuteSingleAction(action) {
         try {
             Run, %A_AhkPath% /c "%action%", , UseErrorLevel
             if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تنفيذ الأمر: %action%`nخطأ: %A_LastError%
+                MsgBox, 48, Error, Failed to execute command: %action%`nError: %A_LastError%
             }
         } catch e {
-            MsgBox, 48, خطأ, الأمر غير مدعوم أو غير صالح: %action%`nالسبب: %e%
+            MsgBox, 48, Error, Unsupported or invalid command: %action%`nReason: %e%
         }
     }
 }
@@ -1693,7 +1695,7 @@ ExecuteCustomXHotkey:
     }
     if WinActive("ahk_class Qt5QWindowIcon")
     {
-        Run, "F:\D old\أبو هدهود\Fundamentals of Programming #Course 1\الدرس السادس_ اجزاء البايت ومصطلحاتها(360P).mp4"
+        Run, "F:\D old\Abu Hadhoud\Fundamentals of Programming #Course 1\Lesson Six_ Parts of a Byte and Its Terms(360P).mp4"
     }
     if WinActive("ahk_class Chrome_WidgetWin_1")
     {
