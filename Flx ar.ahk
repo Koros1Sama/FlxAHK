@@ -247,25 +247,20 @@ GenerateHotkeyListForMenu() {
     for fullKey, action in CustomHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        condition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : ""
-        displayText := baseHotkey " & " . key . " - " . action . (condition ? " (" . condition . ")" : "")
-        list .= displayText . "|"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        LV_Add("", key, winCondition, action, "بسيط (Flx)")
     }
-    ; AdvancedScripts
-    for fullKey, scriptPath in AdvancedScripts {
+    for fullKey, script in AdvancedScripts {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        condition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : ""
-        displayText := baseHotkey " & " . key . " - " . scriptPath . (condition ? " (" . condition . ")" : "")
-        list .= displayText . "|"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        LV_Add("", key, winCondition, script, "متقدم (Flx)")
     }
-    ; NoFlxHotkeys
     for fullKey, action in NoFlxHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
-        condition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : ""
-        displayText := key . " - " . action . (condition ? " (" . condition . ")" : "")
-        list .= displayText . "|"
+        winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
+        LV_Add("", key, winCondition, action, "بسيط (NoFlx)")
     }
     return RTrim(list, "|")
 }
@@ -1425,14 +1420,12 @@ DeleteSelectedHotkeys:
     IfMsgBox, Yes
     {
         for index, item in selectedRows {
-            if (InStr(item.Type, "Flx")) {
-                if (InStr(item.Type, "بسيط")) {
-                    DeleteHotkeyAction(item.Key)
-                } else {
-                    DeleteAdvancedScript(item.Key)
-                }
-            } else {
+            if (InStr(item.Type, "NoFlx")) {
                 DeleteNoFlxHotkey(item.Key)
+            } else if (InStr(item.Type, "بسيط")) {
+                DeleteHotkeyAction(item.Key)
+            } else if (InStr(item.Type, "متقدم")) {
+                DeleteAdvancedScript(item.Key)
             }
         }
         Gosub, OpenHotkeyManagerGUI
@@ -1479,13 +1472,15 @@ DeleteNoFlxHotkey(fullKey) {
     SplitKeyCond := StrSplit(fullKey, "|")
     key := SplitKeyCond[1]
     NoFlxHotkeys.Delete(fullKey)
-    HotkeyConditions[key].Delete(fullKey)
-    if (HotkeyConditions[key].Count() = 0) {
-        HotkeyConditions.Delete(key)
-        try {
-            Hotkey, %key%, Off
-        } catch e {
-            ; تجاهل الأخطاء
+    if (HotkeyConditions.HasKey(key)) {
+        HotkeyConditions[key].Delete(fullKey)
+        if (HotkeyConditions[key].Count() = 0) {
+            HotkeyConditions.Delete(key)
+            try {
+                Hotkey, %key%, Off
+            } catch e {
+                ; تجاهل الأخطاء إذا لم يكن الاختصار معرفًا
+            }
         }
     }
 }
