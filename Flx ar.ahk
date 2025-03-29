@@ -9,6 +9,7 @@ scriptsDir := A_ScriptDir "\Scripts"
 if !FileExist(scriptsDir) {
     FileCreateDir, %scriptsDir%
 }
+HotkeyConditions := {} ; لتتبع شروط NoFlxHotkeys
 
 IniRead, monitoredFolders, %iniFile%, Settings, MonitoredFolders, F:\Anime,F:\Movies
 IniRead, processNames, %iniFile%, Settings, ProcessNames, telegram.exe
@@ -16,6 +17,30 @@ IniRead, checkInterval, %iniFile%, Settings, CheckInterval, 1000
 IniRead, isSecureMode, %iniFile%, Settings, IsSecureMode, 0
 IniRead, baseHotkey, %iniFile%, HotkeySettings, BaseKey, SC056
 global baseHotkey
+
+; التحقق من صلاحية baseHotkey
+if (!baseHotkey || baseHotkey = "ERROR") {
+    InputBox, baseHotkey, إدخال زر Flx, أدخل رمز المفتاح الأساسي (مثل SC056 أو SC029):,, 300, 150,,,, SC056
+    if (ErrorLevel || baseHotkey = "") {
+        MsgBox, 48, خطأ, لم يتم إدخال زر Flx صالح. سيتم إنهاء السكربت.
+        ExitApp
+    }
+    IniWrite, %baseHotkey%, %iniFile%, HotkeySettings, BaseKey
+}
+
+; إعادة تعريف الاختصارات بناءً على baseHotkey
+ReloadHotkeys("")  ; استدعاء ReloadHotkeys بدون oldBaseHotkey لأنه التحميل الأولي
+
+; تعريف الاختصارات الثابتة (للتأكد فقط)
+try {
+    Hotkey, %baseHotkey%, OpenInteractiveMode, On
+    Hotkey, % baseHotkey " & D", ToggleSecureMode, On
+    Hotkey, % baseHotkey " & ,", OpenSettings, On
+    Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
+    Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
+} catch e {
+    MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
+}
 
 ; تحميل الاختصارات البسيطة مع شروط النافذة
 CustomHotkeys := {}
@@ -93,7 +118,9 @@ Loop, Parse, advScripts, `n
 }
 
 ; تحميل الاختصارات بدون Flx مع شروط النافذة
+; تحميل الاختصارات بدون Flx مع شروط النافذة
 NoFlxHotkeys := {}
+HotkeyConditions := {} ; لتتبع الشروط لكل مفتاح
 IniRead, noFlxKeys, %iniFile%, NoFlx
 if (noFlxKeys = "ERROR") {
     noFlxKeys := ""
@@ -118,13 +145,48 @@ Loop, Parse, noFlxKeys, `n
             continue
         }
         NoFlxHotkeys[fullKey] := action
+        ; تخزين الشرط لكل مفتاح
+        if (!HotkeyConditions.HasKey(key)) {
+            HotkeyConditions[key] := {}
+        }
+        HotkeyConditions[key][fullKey] := winCondition
+        ; تعريف الاختصار ديناميكيًا مع شرط النافذة
         try {
-            Hotkey, %key%, ExecuteNoFlxHotkey, On
+            if (winCondition) {
+                Hotkey, IfWinActive, %winCondition%
+                Hotkey, %key%, ExecuteNoFlxHotkeyConditional, On
+                Hotkey, IfWinActive
+            } else {
+                Hotkey, %key%, ExecuteNoFlxHotkeyConditional, On
+            }
         } catch e {
             MsgBox, 48, خطأ, فشل تعريف الاختصار بدون Flx عند التحميل: %key%`nالسبب: %e%
         }
     }
 }
+
+; تنفيذ الاختصارات بدون Flx مع التحقق من الشرط
+ExecuteNoFlxHotkeyConditional:
+    global NoFlxHotkeys, HotkeyConditions
+    keyPressed := A_ThisHotkey
+    WinGet, activeExe, ProcessName, A
+    currentWinCondition := activeExe ? "ahk_exe " . activeExe : ""
+    fullKeyWithCondition := keyPressed . (currentWinCondition ? "|" . currentWinCondition : "")
+    fullKeyDefault := keyPressed
+
+    ; التحقق من وجود الاختصار مع الشرط أو بدونه
+    if (NoFlxHotkeys.HasKey(fullKeyWithCondition)) {
+        action := NoFlxHotkeys[fullKeyWithCondition]
+        ExecuteSingleAction(action)
+    } else if (NoFlxHotkeys.HasKey(fullKeyDefault)) {
+        action := NoFlxHotkeys[fullKeyDefault]
+        ExecuteSingleAction(action)
+    }
+    ; إذا لم يتم تنفيذ أي إجراء، السماح للمفتاح بالمرور
+    else {
+        Send {%keyPressed%}
+    }
+return
 
 ; واجهة مؤشر وضع التسريع
 Gui, SecureModeIndicator:+LastFound +AlwaysOnTop +ToolWindow -Caption +E0x20
@@ -143,16 +205,18 @@ if (isSecureMode) {
 }
 
 ;------------------ Hotkeys ------------------
-Hotkey, %baseHotkey%, OpenInteractiveMode
-Hotkey, % baseHotkey " & F", ToggleSecureMode
-Hotkey, % baseHotkey " & ,", OpenSettings
-Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI
+; تعريف الاختصارات الثابتة باستخدام baseHotkey
 try {
+    Hotkey, %baseHotkey%, OpenInteractiveMode, On
+    Hotkey, % baseHotkey " & D", ToggleSecureMode, On
+    Hotkey, % baseHotkey " & ,", OpenSettings, On
+    Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
     Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
 } catch e {
-    MsgBox, 48, خطأ, فشل تعريف الاختصار %baseHotkey% & X`nالسبب: %e%
+    MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
 }
 
+; تعريف الاختصار الإضافي Ctrl+Win+=
 ^#+=::
 OpenCustomHotkeysGUI()
 return
@@ -233,12 +297,6 @@ ExecuteFromMenu:
     isFlx := InStr(keyDisplay, baseHotkey " & ")
     key := isFlx ? StrReplace(keyDisplay, baseHotkey " & ") : keyDisplay
     fullKey := StrReplace(key, ";", "VKBA") . (condition ? "|" . condition : "")
-
-    ; التحقق من الشرط إذا كان موجودًا
-    if (condition && !WinActive(condition)) {
-        MsgBox, 48, خطأ, النافذة المطلوبة غير نشطة: %condition%
-        return
-    }
 
     ; إغلاق الواجهة أولاً
     Gui, InteractiveMenu:Destroy
@@ -490,6 +548,7 @@ return
 
 ReloadHotkeys(oldBaseHotkey) {
     global baseHotkey, CustomHotkeys, AdvancedScripts, NoFlxHotkeys
+    ; تعطيل الاختصارات القديمة لـ CustomHotkeys و AdvancedScripts
     for fullKey in CustomHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := SplitKeyCond[1]
@@ -497,7 +556,7 @@ ReloadHotkeys(oldBaseHotkey) {
         try {
             Hotkey, % oldBaseHotkey " & " . baseKey, Off
         } catch e {
-            ; تجاهل الأخطاء
+            ; تجاهل الأخطاء إذا لم يكن معرفًا
         }
     }
     for fullKey in AdvancedScripts {
@@ -510,6 +569,17 @@ ReloadHotkeys(oldBaseHotkey) {
             ; تجاهل الأخطاء
         }
     }
+    ; تعطيل الاختصارات الثابتة القديمة
+    try {
+        Hotkey, %oldBaseHotkey%, Off
+        Hotkey, % oldBaseHotkey " & D", Off
+        Hotkey, % oldBaseHotkey " & ,", Off
+        Hotkey, % oldBaseHotkey " & =", Off
+        Hotkey, % oldBaseHotkey " & X", Off
+    } catch e {
+        ; تجاهل الأخطاء
+    }
+    ; تفعيل الاختصارات الجديدة لـ CustomHotkeys و AdvancedScripts
     for fullKey in CustomHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := SplitKeyCond[1]
@@ -530,8 +600,10 @@ ReloadHotkeys(oldBaseHotkey) {
             MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
         }
     }
+    ; تفعيل الاختصارات الثابتة الجديدة
     try {
-        Hotkey, % baseHotkey " & F", ToggleSecureMode, On
+        Hotkey, %baseHotkey%, OpenInteractiveMode, On
+        Hotkey, % baseHotkey " & D", ToggleSecureMode, On
         Hotkey, % baseHotkey " & ,", OpenSettings, On
         Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
         Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
@@ -1402,15 +1474,19 @@ DeleteAdvancedScript(fullKey) {
 }
 
 DeleteNoFlxHotkey(fullKey) {
-    global iniFile, NoFlxHotkeys
+    global iniFile, NoFlxHotkeys, HotkeyConditions
     IniDelete, %iniFile%, NoFlx, %fullKey%
-    NoFlxHotkeys.Delete(fullKey)
     SplitKeyCond := StrSplit(fullKey, "|")
     key := SplitKeyCond[1]
-    try {
-        Hotkey, %key%, Off
-    } catch e {
-        ; تجاهل الأخطاء
+    NoFlxHotkeys.Delete(fullKey)
+    HotkeyConditions[key].Delete(fullKey)
+    if (HotkeyConditions[key].Count() = 0) {
+        HotkeyConditions.Delete(key)
+        try {
+            Hotkey, %key%, Off
+        } catch e {
+            ; تجاهل الأخطاء
+        }
     }
 }
 
@@ -1497,7 +1573,7 @@ AddAdvancedScript(key, script, useCtrl := 0, useShift := 0, useAlt := 0, useWin 
 }
 
 AddNoFlxHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 0, winCondition := "") {
-    global iniFile, NoFlxHotkeys
+    global iniFile, NoFlxHotkeys, HotkeyConditions
     if (key = ";") {
         key := "VKBA"
     } else {
@@ -1514,8 +1590,18 @@ AddNoFlxHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 
     }
     IniWrite, %action%, %iniFile%, NoFlx, %fullKey%
     NoFlxHotkeys[fullKey] := action
+    if (!HotkeyConditions.HasKey(modifierPrefix . key)) {
+        HotkeyConditions[modifierPrefix . key] := {}
+    }
+    HotkeyConditions[modifierPrefix . key][fullKey] := winCondition
     try {
-        Hotkey, % modifierPrefix . key, ExecuteNoFlxHotkey, On
+        if (winCondition) {
+            Hotkey, IfWinActive, %winCondition%
+            Hotkey, % modifierPrefix . key, ExecuteNoFlxHotkeyConditional, On
+            Hotkey, IfWinActive
+        } else {
+            Hotkey, % modifierPrefix . key, ExecuteNoFlxHotkeyConditional, On
+        }
     } catch e {
         MsgBox, 48, خطأ, فشل تعريف الاختصار بدون Flx: %fullKey%`nالسبب: %e%
     }
@@ -1593,48 +1679,51 @@ ExecuteSingleAction(action) {
     action := Trim(action)
     if (InStr(action, "Run ") = 1) {
         command := Trim(SubStr(action, 5))
-        
-        ; استخراج اسم العملية أو المسار للتحقق منه
         SplitPath, command, fileName, dir
-        if (fileName = "") {  ; إذا كان المسار مجلدًا فقط
-            ; تشغيل المجلد مباشرة بدون تحقق
+        if (fileName = "") {  ; إذا كان مجلدًا
             Run, explorer.exe "%command%", , UseErrorLevel
             if (A_LastError) {
                 MsgBox, 48, خطأ, فشل فتح المجلد: %command%`nخطأ: %A_LastError%
             }
             return
-        } else {  ; إذا كان ملفًا (مثل تطبيق)
-            targetPath := fileName
         }
 
-        ; التعامل مع التطبيقات فقط
-        WinGet, activePath, ProcessName, A
+        ; الحصول على المسار الكامل للتطبيق
+        fullPath := command
+
+        ; التحقق من النافذة المركزة فقط
+        WinGet, activeFullPath, ProcessPath, A  ; المسار الكامل للنافذة النشطة
         WinGet, activeID, ID, A
-        if (activePath = targetPath) {  ; إذا كان التطبيق نشطاً
+        if (activeFullPath = fullPath) {  ; إذا كانت النافذة المركزة هي التطبيق المطلوب
             WinMinimize, ahk_id %activeID%
             return
-        } else {
-            WinGet, processList, List, ahk_exe %targetPath%
-            if (processList > 0) {  ; إذا كان التطبيق مفتوحاً
-                Loop, %processList% {
-                    thisID := processList%A_Index%
-                    WinGet, thisState, MinMax, ahk_id %thisID%
-                    if (thisState != -1) {  ; إذا لم يكن مصغراً
-                        WinMinimize, ahk_id %thisID%
-                        return
-                    } else {  ; إذا كان مصغراً
-                        WinRestore, ahk_id %thisID%
-                        WinActivate, ahk_id %thisID%
-                        return
-                    }
-                }
+        }
+
+        ; البحث عن النافذة إذا لم تكن مركزة
+        WinGet, processList, List
+        found := false
+        targetID := ""
+        Loop, %processList% {
+            thisID := processList%A_Index%
+            WinGet, thisPath, ProcessPath, ahk_id %thisID%
+            if (thisPath = fullPath) {  ; إذا تطابق المسار الكامل
+                found := true
+                targetID := thisID
+                break  ; نوقف البحث بمجرد العثور على النافذة
             }
         }
 
-        ; إذا لم يكن التطبيق مفتوحاً، شغله
-        Run, %command%, , UseErrorLevel
-        if (A_LastError) {
-            MsgBox, 48, خطأ, فشل تشغيل: %command%`nخطأ: %A_LastError%
+        if (found) {  ; إذا وجدنا النافذة ولكنها ليست مركزة
+            WinGet, thisState, MinMax, ahk_id %targetID%
+            if (thisState = -1) {  ; إذا كانت مصغرة
+                WinRestore, ahk_id %targetID%
+            }
+            WinActivate, ahk_id %targetID%  ; نركز على النافذة
+        } else {  ; إذا لم يتم العثور على النافذة، نشغل التطبيق
+            Run, %command%, , UseErrorLevel
+            if (A_LastError) {
+                MsgBox, 48, خطأ, فشل تشغيل: %command%`nخطأ: %A_LastError%
+            }
         }
     } else if (InStr(action, "Send ") = 1) {
         command := Trim(SubStr(action, 6))
