@@ -458,11 +458,11 @@ CancelSettings:
 return
 
 OpenCustomHotkeysGUI() {
-    global iniFile, CustomHotkeys, AdvancedScripts, baseHotkey, NoFlxHotkeys
+    global iniFile, CustomHotkeys, AdvancedScripts, baseHotkey, NoFlxHotkeys, scriptsDir
     Gui, CustomHotkeys:Destroy
     Gui, CustomHotkeys:Color, 2D2D2D
     Gui, CustomHotkeys:Font, cFFFFFF s10, Segoe UI
-    Gui, CustomHotkeys:Add, Tab3, x0 y0 w650 h400, أساسي|متقدم
+    Gui, CustomHotkeys:Add, Tab3, x0 y0 w650 h450, أساسي|متقدم
     Gui, CustomHotkeys:Tab, أساسي
     Gui, CustomHotkeys:Add, Text, x20 y50 w610 h30 Center cFFD700, إدارة الاختصارات بسهولة
     Gui, CustomHotkeys:Add, Text, x20 y90 w150 h25, المفتاح (مثل T أو \):
@@ -501,10 +501,37 @@ OpenCustomHotkeysGUI() {
     Gui, CustomHotkeys:Add, Text, x20 y210 w150 h25, السكربت (كود AHK كامل):
     Gui, CustomHotkeys:Add, Edit, x180 y210 w300 h80 vAdvHotkeyScript c000000 Background424242 Multi,
     Gui, CustomHotkeys:Add, Button, x490 y210 w80 h25 gBrowseAdvAction, تصفح
-    Gui, CustomHotkeys:Add, Button, x180 y300 w100 h30 gAddAdvHotkey, إضافة
-    Gui, CustomHotkeys:Add, Button, x340 y300 w100 h30 gOpenHotkeyManagerGUI, إدارة الإختصارات
-    Gui, CustomHotkeys:Show, w650 h400, إدارة الاختصارات
+    Gui, CustomHotkeys:Add, Text, x20 y300 w150 h25, اختر سكربت موجود:
+    Gui, CustomHotkeys:Add, DropDownList, x180 y300 w300 h25 R10 vSelectedScript c000000 Background424242 gLoadSelectedScript, % GetScriptList()
+    Gui, CustomHotkeys:Add, Button, x490 y300 w80 h25 gLoadSelectedScript, تحميل
+    Gui, CustomHotkeys:Add, Button, x180 y340 w100 h30 gAddAdvHotkey, إضافة
+    Gui, CustomHotkeys:Add, Button, x340 y340 w100 h30 gOpenHotkeyManagerGUI, إدارة الإختصارات
+    Gui, CustomHotkeys:Show, w650 h450, إدارة الاختصارات
 }
+
+GetScriptList() {
+    global scriptsDir
+    scriptList := ""
+    Loop, Files, %scriptsDir%\*.ahk
+    {
+        SplitPath, A_LoopFileName,,,, scriptName
+        scriptList .= scriptName "|"
+    }
+    return RTrim(scriptList, "|")
+}
+
+LoadSelectedScript:
+    Gui, CustomHotkeys:Submit, NoHide
+    if (SelectedScript != "") {
+        fullPath := scriptsDir "\" SelectedScript ".ahk"
+        if FileExist(fullPath) {
+            FileRead, scriptContent, %fullPath%
+            GuiControl, CustomHotkeys:, AdvHotkeyScript, %scriptContent%  ; عرض المحتوى للتحقق فقط
+        } else {
+            MsgBox, 48, خطأ, السكربت غير موجود: %fullPath%
+        }
+    }
+return
 
 BrowseWinCondition:
 BrowseWinConditionAdv:
@@ -1087,22 +1114,17 @@ CancelFolderInput:
     Gui, FolderInput:Destroy
 return
 AddAdvHotkey:
-    global AdvancedScripts
+    global AdvancedScripts, iniFile, baseHotkey, scriptsDir
     Gui, CustomHotkeys:Submit, NoHide
-    if (AdvHotkeyKey = "" || AdvHotkeyScript = "") {
-        MsgBox, 48, خطأ, يرجى إدخال مفتاح وسكربت.
+    if (AdvHotkeyKey = "") {
+        MsgBox, 48, خطأ, يرجى إدخال مفتاح.
         return
     }
     modifierPrefix := (AdvUseFlx ? "" : "") . (AdvUseCtrl ? "^" : "") . (AdvUseShift ? "+" : "") . (AdvUseAlt ? "!" : "") . (AdvUseWin ? "#" : "")
     key := modifierPrefix . AdvHotkeyKey
     fullKey := key . (AdvWinCondition ? "|" . AdvWinCondition : "")
-    defaultScriptName := ""
-    isEdit := 0
-    if (AdvUseFlx && AdvancedScripts.HasKey(fullKey)) {
-        defaultScriptName := StrReplace(AdvancedScripts[fullKey], "Scripts\", "")
-        defaultScriptName := StrReplace(defaultScriptName, ".ahk", "")
-        isEdit := 1
-    }
+    
+    ; التحقق من وجود الاختصار مسبقًا
     if (AdvUseFlx && (CustomHotkeys.HasKey(fullKey) || AdvancedScripts.HasKey(fullKey))) {
         oldAction := CustomHotkeys[fullKey] ? CustomHotkeys[fullKey] : AdvancedScripts[fullKey]
         MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %AdvWinCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
@@ -1114,21 +1136,89 @@ AddAdvHotkey:
         IfMsgBox, No
             return
     }
+
     if (AdvUseFlx) {
-        result := AddAdvancedScript(AdvHotkeyKey, AdvHotkeyScript, AdvUseCtrl, AdvUseShift, AdvUseAlt, AdvUseWin, defaultScriptName, AdvWinCondition)
-        if (result = 1) {
-            GuiControl, CustomHotkeys:, AdvHotkeyKey,
-            GuiControl, CustomHotkeys:, AdvHotkeyScript,
-            GuiControl, CustomHotkeys:, AdvWinCondition,
-            GuiControl, CustomHotkeys:, AdvUseFlx, 1
-            GuiControl, CustomHotkeys:, AdvUseCtrl, 0
-            GuiControl, CustomHotkeys:, AdvUseShift, 0
-            GuiControl, CustomHotkeys:, AdvUseAlt, 0
-            GuiControl, CustomHotkeys:, AdvUseWin, 0
-            actionText := isEdit ? "تعديل" : "إضافة"
-            MsgBox, 64, تم, تمت %actionText% السكربت المتقدم بنجاح!
+        ; إذا تم اختيار سكربت من القائمة المنسدلة
+        if (SelectedScript != "") {
+            scriptPath := "Scripts\" SelectedScript ".ahk"
+            fullScriptPath := scriptsDir "\" SelectedScript ".ahk"
+            if (!FileExist(fullScriptPath)) {
+                MsgBox, 48, خطأ, السكربت المختار غير موجود: %fullScriptPath%
+                return
+            }
+            ; حذف الإدخال القديم إذا كان موجودًا
+            if (AdvancedScripts.HasKey(fullKey)) {
+                IniDelete, %iniFile%, AdvancedScripts, %fullKey%
+            }
+            ; تسجيل السكربت الموجود مباشرة
+            IniWrite, %scriptPath%, %iniFile%, AdvancedScripts, %fullKey%
+            AdvancedScripts[fullKey] := scriptPath
+            baseKey := RegExReplace(key, "[+^!#]")
+            try {
+                Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
+            } catch e {
+                MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+                return
+            }
         }
+        ; إذا تم إدخال سكربت يدويًا في حقل النص
+        else if (AdvHotkeyScript != "") {
+            defaultScriptName := AdvHotkeyKey
+            InputBox, scriptName, إدخال اسم السكربت, أدخل اسمًا للسكربت (بدون .ahk):,, 300, 150,,,, %defaultScriptName%
+            if (ErrorLevel || scriptName = "") {
+                return
+            }
+            if (SubStr(scriptName, -3) != ".ahk") {
+                scriptName .= ".ahk"
+            }
+            scriptPath := "Scripts\" scriptName
+            fullScriptPath := scriptsDir "\" scriptName
+            for existingKey, existingPath in AdvancedScripts {
+                if (existingPath = scriptPath && existingKey != fullKey) {
+                    MsgBox, 48, خطأ, اسم السكربت %scriptName% مستخدم بالفعل لاختصار آخر.`nيرجى اختيار اسم مختلف.
+                    return
+                }
+            }
+            FileDelete, %fullScriptPath%
+            FileAppend, %AdvHotkeyScript%, %fullScriptPath%, UTF-8
+            if (ErrorLevel) {
+                MsgBox, 48, خطأ, فشل حفظ السكربت في: %fullScriptPath%
+                return
+            }
+            if (AdvancedScripts.HasKey(fullKey)) {
+                oldScriptPath := AdvancedScripts[fullKey]
+                if (oldScriptPath != scriptPath) {
+                    FileDelete, % A_ScriptDir "\" oldScriptPath
+                }
+                IniDelete, %iniFile%, AdvancedScripts, %fullKey%
+            }
+            IniWrite, %scriptPath%, %iniFile%, AdvancedScripts, %fullKey%
+            AdvancedScripts[fullKey] := scriptPath
+            baseKey := RegExReplace(key, "[+^!#]")
+            try {
+                Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
+            } catch e {
+                MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+                return
+            }
+        } else {
+            MsgBox, 48, خطأ, يرجى إدخال سكربت أو اختيار واحد من القائمة.
+            return
+        }
+        
+        ; إعادة تعيين الحقول بعد الإضافة
+        GuiControl, CustomHotkeys:, AdvHotkeyKey,
+        GuiControl, CustomHotkeys:, AdvHotkeyScript,
+        GuiControl, CustomHotkeys:, AdvWinCondition,
+        GuiControl, CustomHotkeys:, AdvUseFlx, 1
+        GuiControl, CustomHotkeys:, AdvUseCtrl, 0
+        GuiControl, CustomHotkeys:, AdvUseShift, 0
+        GuiControl, CustomHotkeys:, AdvUseAlt, 0
+        GuiControl, CustomHotkeys:, AdvUseWin, 0
+        GuiControl, CustomHotkeys:, SelectedScript, % "|" GetScriptList()
+        MsgBox, 64, تم, تمت إضافة السكربت المتقدم بنجاح!
     } else {
+        ; إضافة اختصار بدون Flx
         oldHotkeyCount := NoFlxHotkeys.Count()
         AddNoFlxHotkey(AdvHotkeyKey, AdvHotkeyScript, AdvUseCtrl, AdvUseShift, AdvUseAlt, AdvUseWin, AdvWinCondition)
         if (NoFlxHotkeys.Count() > oldHotkeyCount || NoFlxHotkeys.HasKey(fullKey)) {
@@ -1165,9 +1255,10 @@ OpenHotkeyManagerGUI:
     Gui, HotkeyManager:Add, Edit, x20 y50 w440 h25 vSearchTerm gSearchHotkeys c000000 Background424242,
     Gui, HotkeyManager:Add, Button, x470 y50 w90 h25 gSearchHotkeys, بحث
     Gui, HotkeyManager:Add, ListView, x20 y80 w540 h200 vHotkeyList gHotkeyListEvent -Multi +Grid +LV0x10000 Background2D2D2D, المفتاح|النافذة|الإجراء|النوع
-    Gui, HotkeyManager:Add, Button, x130 y290 w100 h30 gDeleteSelectedHotkeys, حذف المحدد
-    Gui, HotkeyManager:Add, Button, x260 y290 w100 h30 gEditSelectedHotkey, تعديل
-    Gui, HotkeyManager:Add, Button, x390 y290 w100 h30 gCancelHotkeyManager, إلغاء
+    Gui, HotkeyManager:Add, Button, x20 y290 w150 h30 gManageUnusedScripts, إدارة السكربتات غير المستخدمة
+    Gui, HotkeyManager:Add, Button, x180 y290 w100 h30 gDeleteSelectedHotkeys, حذف المحدد
+    Gui, HotkeyManager:Add, Button, x300 y290 w100 h30 gEditSelectedHotkey, تعديل
+    Gui, HotkeyManager:Add, Button, x420 y290 w100 h30 gCancelHotkeyManager, إلغاء
     for fullKey, action in CustomHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
@@ -1191,6 +1282,60 @@ OpenHotkeyManagerGUI:
     LV_ModifyCol(3, 340)
     LV_ModifyCol(4, 50)
     Gui, HotkeyManager:Show, w650 h330, إدارة الاختصارات
+return
+
+ManageUnusedScripts:
+    global AdvancedScripts, scriptsDir
+    Gui, UnusedScripts:Destroy
+    Gui, UnusedScripts:Color, 2D2D2D
+    Gui, UnusedScripts:Font, cFFFFFF s10, Segoe UI
+    Gui, UnusedScripts:Add, Text, x20 y20 w540 h25, السكربتات غير المستخدمة في أي اختصار:
+    Gui, UnusedScripts:Add, ListBox, x20 y50 w540 h200 vUnusedScriptList c000000 Background424242, % GetUnusedScriptList()
+    Gui, UnusedScripts:Add, Button, x180 y260 w100 h30 gDeleteSelectedUnusedScript, حذف المحدد
+    Gui, UnusedScripts:Add, Button, x300 y260 w100 h30 gCancelUnusedScripts, إلغاء
+    Gui, UnusedScripts:Show, w600 h300, إدارة السكربتات غير المستخدمة
+return
+
+GetUnusedScriptList() {
+    global AdvancedScripts, scriptsDir
+    usedScripts := {}
+    scriptList := ""
+    for fullKey, scriptPath in AdvancedScripts {
+        usedScripts[scriptPath] := true
+    }
+    Loop, Files, %scriptsDir%\*.ahk
+    {
+        scriptPath := "Scripts\" A_LoopFileName
+        SplitPath, A_LoopFileName,,,, scriptName
+        if (!usedScripts.HasKey(scriptPath)) {
+            scriptList .= scriptName "|"
+        }
+    }
+    return RTrim(scriptList, "|")
+}
+
+DeleteSelectedUnusedScript:
+    Gui, UnusedScripts:Submit, NoHide
+    if (UnusedScriptList = "") {
+        MsgBox, 48, خطأ, يرجى تحديد سكربت لحذفه.
+        return
+    }
+    fullPath := scriptsDir "\" UnusedScriptList ".ahk"
+    MsgBox, 4, تأكيد, هل تريد حذف السكربت "%UnusedScriptList%"؟
+    IfMsgBox, Yes
+    {
+        FileDelete, %fullPath%
+        if (ErrorLevel) {
+            MsgBox, 48, خطأ, فشل حذف السكربت: %fullPath%
+        } else {
+            GuiControl, UnusedScripts:, UnusedScriptList, % GetUnusedScriptList()
+            MsgBox, 64, تم, تم حذف السكربت بنجاح!
+        }
+    }
+return
+
+CancelUnusedScripts:
+    Gui, UnusedScripts:Destroy
 return
 
 CancelHotkeyManager:
@@ -1279,12 +1424,15 @@ EditSelectedHotkey:
             FileRead, scriptContent, %fullPath%
             GuiControl, EditHotkey:, NewAction, %scriptContent%
         }
+        Gui, EditHotkey:Add, Text, x20 y220 w150 h25, اختر سكربت موجود:
+        Gui, EditHotkey:Add, DropDownList, x180 y220 w300 h25 R10 vSelectedScript c000000 Background424242 gLoadSelectedScriptEdit, % GetScriptList()
+        Gui, EditHotkey:Add, Button, x490 y220 w80 h25 gLoadSelectedScriptEdit, تحميل
     }
-    Gui, EditHotkey:Add, Button, x180 y230 w100 h30 gSaveEditedHotkey, حفظ
-    Gui, EditHotkey:Add, Button, x290 y230 w100 h30 gCancelEditHotkey, إلغاء
-    Gui, EditHotkey:Add, Button, x400 y230 w100 h30 gDeleteFromEditHotkey, حذف
+    Gui, EditHotkey:Add, Button, x180 y260 w100 h30 gSaveEditedHotkey, حفظ
+    Gui, EditHotkey:Add, Button, x290 y260 w100 h30 gCancelEditHotkey, إلغاء
+    Gui, EditHotkey:Add, Button, x400 y260 w100 h30 gDeleteFromEditHotkey, حذف
     if (InStr(type, "متقدم")) {
-        Gui, EditHotkey:Add, Button, x180 y270 w100 h30 gOpenScriptLocation, فتح الموقع
+        Gui, EditHotkey:Add, Button, x180 y300 w100 h30 gOpenScriptLocation, فتح الموقع
     }
     ; تعيين حالة مفاتيح التعديل
     if (InStr(fullSelectedKey, "^"))
@@ -1295,18 +1443,49 @@ EditSelectedHotkey:
         GuiControl, EditHotkey:, UseAlt, 1
     if (InStr(fullSelectedKey, "#"))
         GuiControl, EditHotkey:, UseWin, 1
-    ; تحديد حالة الـ Flx بناءً على نوع الاختصار
     if (InStr(type, "NoFlx"))
         GuiControl, EditHotkey:, UseFlx, 0
     else
         GuiControl, EditHotkey:, UseFlx, 1
-    Gui, EditHotkey:Show, w600 h310, تعديل الاختصار
+    Gui, EditHotkey:Show, w600 h340, تعديل الاختصار
+return
+
+LoadSelectedScriptEdit:
+    Gui, EditHotkey:Submit, NoHide
+    if (SelectedScript != "") {
+        fullPath := scriptsDir "\" SelectedScript ".ahk"
+        if FileExist(fullPath) {
+            FileRead, scriptContent, %fullPath%
+            GuiControl, EditHotkey:, NewAction, %scriptContent%  ; عرض المحتوى للتحقق فقط
+        } else {
+            MsgBox, 48, خطأ, السكربت غير موجود: %fullPath%
+        }
+    }
 return
 
 BrowseWinConditionEdit:
     ; تقديم البيانات الحالية للحفاظ على القيمة
     Gui, EditHotkey:Submit, NoHide
-    ; إخفاء الواجهات الخاصة بالنوافذ المعنية مؤقتًا
+    
+    ; متغيرات لتتبع حالة النوافذ (true إذا كانت مفتوحة، false إذا لم تكن)
+    EditHotkeyVisible := false
+    CustomHotkeysVisible := false
+    HotkeyManagerVisible := false
+    
+    ; التحقق من النوافذ المفتوحة باستخدام معرفات دقيقة
+    Gui, EditHotkey:+LastFound
+    if (WinExist("تعديل الاختصار ahk_id " WinExist()))
+        EditHotkeyVisible := true
+    
+    Gui, CustomHotkeys:+LastFound
+    if (WinExist("إدارة الاختصارات ahk_id " WinExist()))
+        CustomHotkeysVisible := true
+    
+    Gui, HotkeyManager:+LastFound
+    if (WinExist("إدارة الاختصارات ahk_id " WinExist()))
+        HotkeyManagerVisible := true
+    
+    ; إخفاء جميع النوافذ المعنية مؤقتًا
     Gui, EditHotkey:Hide
     Gui, CustomHotkeys:Hide
     Gui, HotkeyManager:Hide
@@ -1315,11 +1494,17 @@ BrowseWinConditionEdit:
     KeyWait, LButton, D T10
     if (ErrorLevel) {
         MsgBox, 48, خطأ, لم يتم النقر على أي نافذة خلال 10 ثوانٍ.
-        Gui, EditHotkey:Show
-        Gui, CustomHotkeys:Show
-        Gui, HotkeyManager:Show
+        ; إعادة إظهار النوافذ التي كانت مفتوحة فقط
+        if (CustomHotkeysVisible)
+            Gui, CustomHotkeys:Show
+        if (HotkeyManagerVisible)
+            Gui, HotkeyManager:Show
+        if (EditHotkeyVisible)
+            Gui, EditHotkey:Show
         return
     }
+    
+    ; الحصول على النافذة التي تم النقر عليها
     MouseGetPos,,, windowID
     WinGet, activeExe, ProcessName, ahk_id %windowID%
     if (activeExe) {
@@ -1328,10 +1513,14 @@ BrowseWinConditionEdit:
     } else {
         MsgBox, 48, خطأ, لم يتم العثور على عملية مرتبطة بالنافذة المختارة.
     }
-    ; إعادة إظهار الواجهات التي أُخفيت
-    Gui, HotkeyManager:Show
-    Gui, CustomHotkeys:Show
-    Gui, EditHotkey:Show
+    
+    ; إعادة إظهار النوافذ التي كانت مفتوحة فقط
+    if (CustomHotkeysVisible)
+        Gui, CustomHotkeys:Show
+    if (HotkeyManagerVisible)
+        Gui, HotkeyManager:Show
+    if (EditHotkeyVisible)
+        Gui, EditHotkey:Show
 return
 
 OpenScriptLocation:
@@ -1380,7 +1569,60 @@ SaveEditedHotkey:
         } else {
             DeleteAdvancedScript(fullSelectedKey)
             if (UseFlx) {
-                AddAdvancedScript(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin,, NewWinCondition)
+                if (SelectedScript != "") {
+                    ; استخدام السكربت الموجود من القائمة المنسدلة
+                    scriptPath := "Scripts\" SelectedScript ".ahk"
+                    fullScriptPath := scriptsDir "\" SelectedScript ".ahk"
+                    if (!FileExist(fullScriptPath)) {
+                        MsgBox, 48, خطأ, السكربت المختار غير موجود: %fullScriptPath%
+                        return
+                    }
+                    IniWrite, %scriptPath%, %iniFile%, AdvancedScripts, %fullNewKey%
+                    AdvancedScripts[fullNewKey] := scriptPath
+                    baseKey := RegExReplace(newKey, "[+^!#]")
+                    try {
+                        Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
+                    } catch e {
+                        MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+                        return
+                    }
+                } else if (NewAction != "") {
+                    ; إدخال سكربت يدويًا
+                    defaultScriptName := newKey
+                    InputBox, scriptName, إدخال اسم السكربت, أدخل اسمًا للسكربت (بدون .ahk):,, 300, 150,,,, %defaultScriptName%
+                    if (ErrorLevel || scriptName = "") {
+                        return
+                    }
+                    if (SubStr(scriptName, -3) != ".ahk") {
+                        scriptName .= ".ahk"
+                    }
+                    scriptPath := "Scripts\" scriptName
+                    fullScriptPath := scriptsDir "\" scriptName
+                    for existingKey, existingPath in AdvancedScripts {
+                        if (existingPath = scriptPath && existingKey != fullNewKey) {
+                            MsgBox, 48, خطأ, اسم السكربت %scriptName% مستخدم بالفعل لاختصار آخر.`nيرجى اختيار اسم مختلف.
+                            return
+                        }
+                    }
+                    FileDelete, %fullScriptPath%
+                    FileAppend, %NewAction%, %fullScriptPath%, UTF-8
+                    if (ErrorLevel) {
+                        MsgBox, 48, خطأ, فشل حفظ السكربت في: %fullScriptPath%
+                        return
+                    }
+                    IniWrite, %scriptPath%, %iniFile%, AdvancedScripts, %fullNewKey%
+                    AdvancedScripts[fullNewKey] := scriptPath
+                    baseKey := RegExReplace(newKey, "[+^!#]")
+                    try {
+                        Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
+                    } catch e {
+                        MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+                        return
+                    }
+                } else {
+                    MsgBox, 48, خطأ, يرجى إدخال سكربت أو اختيار واحد من القائمة.
+                    return
+                }
             } else {
                 AddNoFlxHotkey(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin, NewWinCondition)
             }
@@ -1391,7 +1633,58 @@ SaveEditedHotkey:
             if (InStr(type, "بسيط")) {
                 AddHotkey(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin, UseFlx, NewWinCondition)
             } else {
-                AddAdvancedScript(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin,, NewWinCondition)
+                if (SelectedScript != "") {
+                    scriptPath := "Scripts\" SelectedScript ".ahk"
+                    fullScriptPath := scriptsDir "\" SelectedScript ".ahk"
+                    if (!FileExist(fullScriptPath)) {
+                        MsgBox, 48, خطأ, السكربت المختار غير موجود: %fullScriptPath%
+                        return
+                    }
+                    IniWrite, %scriptPath%, %iniFile%, AdvancedScripts, %fullNewKey%
+                    AdvancedScripts[fullNewKey] := scriptPath
+                    baseKey := RegExReplace(newKey, "[+^!#]")
+                    try {
+                        Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
+                    } catch e {
+                        MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+                        return
+                    }
+                } else if (NewAction != "") {
+                    defaultScriptName := newKey
+                    InputBox, scriptName, إدخال اسم السكربت, أدخل اسمًا للسكربت (بدون .ahk):,, 300, 150,,,, %defaultScriptName%
+                    if (ErrorLevel || scriptName = "") {
+                        return
+                    }
+                    if (SubStr(scriptName, -3) != ".ahk") {
+                        scriptName .= ".ahk"
+                    }
+                    scriptPath := "Scripts\" scriptName
+                    fullScriptPath := scriptsDir "\" scriptName
+                    for existingKey, existingPath in AdvancedScripts {
+                        if (existingPath = scriptPath && existingKey != fullNewKey) {
+                            MsgBox, 48, خطأ, اسم السكربت %scriptName% مستخدم بالفعل لاختصار آخر.`nيرجى اختيار اسم مختلف.
+                            return
+                        }
+                    }
+                    FileDelete, %fullScriptPath%
+                    FileAppend, %NewAction%, %fullScriptPath%, UTF-8
+                    if (ErrorLevel) {
+                        MsgBox, 48, خطأ, فشل حفظ السكربت في: %fullScriptPath%
+                        return
+                    }
+                    IniWrite, %scriptPath%, %iniFile%, AdvancedScripts, %fullNewKey%
+                    AdvancedScripts[fullNewKey] := scriptPath
+                    baseKey := RegExReplace(newKey, "[+^!#]")
+                    try {
+                        Hotkey, % baseHotkey " & " . baseKey, ExecuteHotkey, On
+                    } catch e {
+                        MsgBox, 48, خطأ, فشل تعريف السكربت المتقدم: %baseHotkey% & %baseKey%`nالسبب: %e%
+                        return
+                    }
+                } else {
+                    MsgBox, 48, خطأ, يرجى إدخال سكربت أو اختيار واحد من القائمة.
+                    return
+                }
             }
         } else {
             AddNoFlxHotkey(newKey, NewAction, UseCtrl, UseShift, UseAlt, UseWin, NewWinCondition)
@@ -1478,12 +1771,7 @@ DeleteHotkeyAction(fullKey) {
 }
 
 DeleteAdvancedScript(fullKey) {
-    global iniFile, AdvancedScripts, scriptsDir, baseHotkey
-    scriptPath := AdvancedScripts[fullKey]
-    if (scriptPath != "") {
-        fullPath := A_ScriptDir "\" scriptPath
-        FileDelete, %fullPath%
-    }
+    global iniFile, AdvancedScripts, baseHotkey
     IniDelete, %iniFile%, AdvancedScripts, %fullKey%
     AdvancedScripts.Delete(fullKey)
     SplitKeyCond := StrSplit(fullKey, "|")
