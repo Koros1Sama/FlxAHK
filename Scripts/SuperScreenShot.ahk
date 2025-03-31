@@ -115,14 +115,14 @@ if (Key >= "1" && Key <= "9")
     Gui, BorderRight:Destroy
 }
 
-return
+Exitapp
 
 BrowseMainFolder:
 Gui, 1:Submit, NoHide
 FileSelectFolder, SelectedFolder, , 3
 if SelectedFolder !=
     GuiControl, 1:, MainFolderPath, %SelectedFolder%
-return
+Exitapp
 
 SaveSettings:
 Gui, 1:Submit
@@ -195,12 +195,12 @@ IniWrite, %Folder8%, %A_ScriptDir%\..\ScreenshotSettings.ini, Folders, Folder8
 IniWrite, %Folder9%, %A_ScriptDir%\..\ScreenshotSettings.ini, Folders, Folder9
 
 Gui, 1:Destroy
-return
+Exitapp
 
 CancelSettings:
 Gui, 1:Destroy
-return
+Exitapp
 
 GuiClose:
 Gui, 1:Destroy
-return
+Exitapp
