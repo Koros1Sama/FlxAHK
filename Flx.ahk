@@ -12,11 +12,15 @@ if !FileExist(scriptsDir) {
 HotkeyConditions := {} ; لتتبع شروط NoFlxHotkeys
 
 IniRead, monitoredFolders, %iniFile%, Settings, MonitoredFolders, F:\Anime,F:\Movies
+IniRead, monitoredFoldersWithSub, %iniFile%, Settings, MonitoredFoldersWithSub, F:\Anime
+IniRead, excludedFolders, %iniFile%, Settings, ExcludedFolders, %A_Space%
 IniRead, processNames, %iniFile%, Settings, ProcessNames, telegram.exe
 IniRead, checkInterval, %iniFile%, Settings, CheckInterval, 1000
 IniRead, isSecureMode, %iniFile%, Settings, IsSecureMode, 0
 IniRead, baseHotkey, %iniFile%, HotkeySettings, BaseKey, SC056
 global baseHotkey
+
+InitSecureModeIndicator()
 
 ; التحقق من صلاحية baseHotkey
 if (!baseHotkey || baseHotkey = "ERROR") {
@@ -118,9 +122,8 @@ Loop, Parse, advScripts, `n
 }
 
 ; تحميل الاختصارات بدون Flx مع شروط النافذة
-; تحميل الاختصارات بدون Flx مع شروط النافذة
 NoFlxHotkeys := {}
-HotkeyConditions := {} ; لتتبع الشروط لكل مفتاح
+HotkeyConditions := {}
 IniRead, noFlxKeys, %iniFile%, NoFlx
 if (noFlxKeys = "ERROR") {
     noFlxKeys := ""
@@ -145,17 +148,16 @@ Loop, Parse, noFlxKeys, `n
             continue
         }
         NoFlxHotkeys[fullKey] := action
-        ; تخزين الشرط لكل مفتاح
         if (!HotkeyConditions.HasKey(key)) {
             HotkeyConditions[key] := {}
         }
         HotkeyConditions[key][fullKey] := winCondition
-        ; تعريف الاختصار ديناميكيًا مع شرط النافذة
         try {
+            ; تعريف الاختصار مع شرط النافذة إذا وجد
             if (winCondition) {
                 Hotkey, IfWinActive, %winCondition%
                 Hotkey, %key%, ExecuteNoFlxHotkeyConditional, On
-                Hotkey, IfWinActive
+                Hotkey, IfWinActive  ; إعادة تعيين السياق
             } else {
                 Hotkey, %key%, ExecuteNoFlxHotkeyConditional, On
             }
@@ -167,42 +169,40 @@ Loop, Parse, noFlxKeys, `n
 
 ; تنفيذ الاختصارات بدون Flx مع التحقق من الشرط
 ExecuteNoFlxHotkeyConditional:
-    global NoFlxHotkeys, HotkeyConditions
+    global NoFlxHotkeys, HotkeyConditions, scriptsDir
     keyPressed := A_ThisHotkey
     WinGet, activeExe, ProcessName, A
     currentWinCondition := activeExe ? "ahk_exe " . activeExe : ""
     fullKeyWithCondition := keyPressed . (currentWinCondition ? "|" . currentWinCondition : "")
     fullKeyDefault := keyPressed
 
-    ; التحقق من وجود الاختصار مع الشرط أو بدونه
+    ; التحقق من الاختصار مع الشرط أو بدونه
     if (NoFlxHotkeys.HasKey(fullKeyWithCondition)) {
         action := NoFlxHotkeys[fullKeyWithCondition]
-        ExecuteSingleAction(action)
     } else if (NoFlxHotkeys.HasKey(fullKeyDefault)) {
         action := NoFlxHotkeys[fullKeyDefault]
+    } else {
+        ; إذا لم يكن هناك اختصار مطابق، نترك المفتاح يمر بشكل طبيعي
+        return
+    }
+
+    ; تنفيذ الإجراء
+    if (RegExMatch(action, "\.ahk$")) {
+        fullPath := (InStr(action, "\") = 1 || InStr(action, ":") = 2) ? action : scriptsDir "\" action
+        if FileExist(fullPath) {
+            SetWorkingDir, %scriptsDir%
+            Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
+            SetWorkingDir, %A_ScriptDir%
+            if (A_LastError) {
+                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
+            }
+        } else {
+            MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
+        }
+    } else {
         ExecuteSingleAction(action)
     }
-    ; إذا لم يتم تنفيذ أي إجراء، السماح للمفتاح بالمرور
-    else {
-        Send {%keyPressed%}
-    }
 return
-
-; واجهة مؤشر وضع التسريع
-Gui, SecureModeIndicator:+LastFound +AlwaysOnTop +ToolWindow -Caption +E0x20
-Gui, SecureModeIndicator:Color, 000000
-WinSet, TransColor, 000000
-Gui, SecureModeIndicator:Font, s12 cFFFFFF, Arial
-Gui, SecureModeIndicator:Add, Text, BackgroundTrans, وضع التسريع
-Gui, SecureModeIndicator:Show, x0 y0 w100 h30 NoActivate
-WinSet, Transparent, 150
-if (isSecureMode) {
-    Gui, SecureModeIndicator:Show, NoActivate
-    SetTimer, CheckSecureMode, %checkInterval%
-} else {
-    Gui, SecureModeIndicator:Hide
-    SetTimer, CheckSecureMode, Off
-}
 
 ;------------------ Hotkeys ------------------
 ; تعريف الاختصارات الثابتة باستخدام baseHotkey
@@ -333,130 +333,6 @@ CancelInteractiveMenu:
     Gui, InteractiveMenu:Destroy
 return
 
-ToggleSecureMode() {
-    global isSecureMode, checkInterval, processNames, iniFile
-    isSecureMode := !isSecureMode
-    IniWrite, %isSecureMode%, %iniFile%, Settings, IsSecureMode
-    if (isSecureMode) {
-        WinGet, activeWindow, ID, A
-        Gui, SecureModeIndicator:Show, NoActivate
-        processList := StrSplit(processNames, ",")
-        for index, proc in processList {
-            Process, Exist, %proc%
-            if (ErrorLevel) {
-                Process, Close, %proc%
-            }
-        }
-        SetTimer, CheckSecureMode, %checkInterval%
-        WinActivate, ahk_id %activeWindow%
-    } else {
-        Gui, SecureModeIndicator:Hide
-        SetTimer, CheckSecureMode, Off
-    }
-}
-
-CheckSecureMode:
-    global isSecureMode, processNames
-    if (isSecureMode) {
-        processList := StrSplit(processNames, ",")
-        for index, proc in processList {
-            Process, Exist, %proc%
-            if (ErrorLevel) {
-                Process, Close, %proc%
-            }
-        }
-        CloseMonitoredFolders()
-    }
-return
-
-CloseMonitoredFolders() {
-    global monitoredFolders
-    shell := ComObjCreate("Shell.Application")
-    folderList := StrSplit(monitoredFolders, ",")
-    for window in shell.Windows {
-        try {
-            windowFolder := window.document.Folder.Self.Path
-        } catch {
-            continue
-        }
-        currentFolder := Trim(windowFolder, " `t`r`n\\")
-        StringLower, currentFolder, currentFolder
-        for index, folder in folderList {
-            targetFolder := Trim(folder, " `t`r`n\\")
-            StringLower, targetFolder, targetFolder
-            if (currentFolder = targetFolder) {
-                window.Quit()
-                Sleep, 100
-                break
-            }
-        }
-    }
-}
-
-OpenSettings() {
-    global monitoredFolders, processNames, checkInterval
-    Gui, GuiSettings:Destroy
-    Gui, GuiSettings:Color, 2D2D2D
-    Gui, GuiSettings:Font, cFFFFFF s10, Segoe UI
-    Gui, GuiSettings:Add, Text, x10 y10 w530 h30 Center cFFD700, إعدادات السكربت
-    Gui, GuiSettings:Add, Text, x10 y50 w200 h25, المجلدات المراقبة (افصل بفواصل):
-    Gui, GuiSettings:Add, Edit, x220 y50 w300 h25 vMonFolders c000000 Background424242, %monitoredFolders%
-    Gui, GuiSettings:Add, Button, x530 y50 w80 h25 gBrowseFolders, تصفح
-    Gui, GuiSettings:Add, Text, x10 y85 w200 h25, العمليات المراقبة (افصل بفواصل):
-    Gui, GuiSettings:Add, Edit, x220 y85 w300 h25 vProcNames c000000 Background424242, %processNames%
-    Gui, GuiSettings:Add, Button, x530 y85 w80 h25 gBrowseProcesses, تصفح
-    Gui, GuiSettings:Add, Text, x10 y120 w200 h25, فترة الفحص (بالملي ثانية):
-    Gui, GuiSettings:Add, Edit, x220 y120 w300 h25 vChkInterval c000000 Background424242, %checkInterval%
-    Gui, GuiSettings:Add, Button, x260 y165 w100 h30 gSaveSettings, حفظ
-    Gui, GuiSettings:Add, Button, x370 y165 w100 h30 gCancelSettings, إلغاء
-    Gui, GuiSettings:Font, cA0A0A0 s8
-    Gui, GuiSettings:Add, Text, x10 y205 w620 h20 Center, استخدم الفواصل لفصل المجلدات والعمليات، أو زر التصفح للإضافة
-    Gui, GuiSettings:Show, w630 h230, إعدادات السكربت
-}
-
-BrowseFolders:
-    Gui, GuiSettings:Submit, NoHide
-    FileSelectFolder, selectedFolder, , 3, اختر مجلدًا للمراقبة
-    if (selectedFolder != "") {
-        if (MonFolders = "")
-            GuiControl, GuiSettings:, MonFolders, %selectedFolder%
-        else
-            GuiControl, GuiSettings:, MonFolders, %MonFolders%,%selectedFolder%
-    }
-return
-
-BrowseProcesses:
-    Gui, GuiSettings:Submit, NoHide
-    FileSelectFile, selectedFile, 3, , اختر عملية للمراقبة, Executable Files (*.exe)
-    if (selectedFile != "") {
-        SplitPath, selectedFile, fileName
-        if (ProcNames = "")
-            GuiControl, GuiSettings:, ProcNames, %fileName%
-        else
-            GuiControl, GuiSettings:, ProcNames, %ProcNames%,%fileName%
-    }
-return
-
-SaveSettings:
-    global monitoredFolders, processNames, checkInterval, iniFile
-    Gui, GuiSettings:Submit, NoHide
-    monitoredFolders := MonFolders
-    processNames := ProcNames
-    if (ChkInterval != "" && RegExMatch(ChkInterval, "^\d+$"))
-        checkInterval := ChkInterval
-    else {
-        MsgBox, 48, تحذير, يجب أن تكون فترة الفحص عددًا صحيحًا.
-    }
-    IniWrite, %monitoredFolders%, %iniFile%, Settings, MonitoredFolders
-    IniWrite, %processNames%, %iniFile%, Settings, ProcessNames
-    IniWrite, %checkInterval%, %iniFile%, Settings, CheckInterval
-    Gui, GuiSettings:Destroy
-return
-
-CancelSettings:
-    Gui, GuiSettings:Destroy
-return
-
 OpenCustomHotkeysGUI() {
     global iniFile, CustomHotkeys, AdvancedScripts, baseHotkey, NoFlxHotkeys, scriptsDir
     Gui, CustomHotkeys:Destroy
@@ -514,7 +390,7 @@ GetScriptList() {
     scriptList := ""
     Loop, Files, %scriptsDir%\*.ahk
     {
-        SplitPath, A_LoopFileName,,,, scriptName
+        SplitPath, A_LoopFileName,,,, scriptName  ; يُرجع الاسم بدون .ahk
         scriptList .= scriptName "|"
     }
     return RTrim(scriptList, "|")
@@ -1114,7 +990,7 @@ CancelFolderInput:
     Gui, FolderInput:Destroy
 return
 AddAdvHotkey:
-    global AdvancedScripts, iniFile, baseHotkey, scriptsDir
+    global AdvancedScripts, iniFile, baseHotkey, scriptsDir, NoFlxHotkeys
     Gui, CustomHotkeys:Submit, NoHide
     if (AdvHotkeyKey = "") {
         MsgBox, 48, خطأ, يرجى إدخال مفتاح.
@@ -1138,7 +1014,7 @@ AddAdvHotkey:
     }
 
     if (AdvUseFlx) {
-        ; إذا تم اختيار سكربت من القائمة المنسدلة
+        ; [الكود الحالي لـ Flx يبقى كما هو]
         if (SelectedScript != "") {
             scriptPath := "Scripts\" SelectedScript ".ahk"
             fullScriptPath := scriptsDir "\" SelectedScript ".ahk"
@@ -1150,7 +1026,6 @@ AddAdvHotkey:
             if (AdvancedScripts.HasKey(fullKey)) {
                 IniDelete, %iniFile%, AdvancedScripts, %fullKey%
             }
-            ; تسجيل السكربت الموجود مباشرة
             IniWrite, %scriptPath%, %iniFile%, AdvancedScripts, %fullKey%
             AdvancedScripts[fullKey] := scriptPath
             baseKey := RegExReplace(key, "[+^!#]")
@@ -1220,7 +1095,20 @@ AddAdvHotkey:
     } else {
         ; إضافة اختصار بدون Flx
         oldHotkeyCount := NoFlxHotkeys.Count()
-        AddNoFlxHotkey(AdvHotkeyKey, AdvHotkeyScript, AdvUseCtrl, AdvUseShift, AdvUseAlt, AdvUseWin, AdvWinCondition)
+        if (SelectedScript != "") {
+            scriptPath := SelectedScript ".ahk"  ; بدون "Scripts\" هنا
+            fullScriptPath := scriptsDir "\" scriptPath
+            if (!FileExist(fullScriptPath)) {
+                MsgBox, 48, خطأ, السكربت المختار غير موجود: %fullScriptPath%
+                return
+            }
+            AddNoFlxHotkey(AdvHotkeyKey, scriptPath, AdvUseCtrl, AdvUseShift, AdvUseAlt, AdvUseWin, AdvWinCondition)
+        } else if (AdvHotkeyScript != "") {
+            AddNoFlxHotkey(AdvHotkeyKey, AdvHotkeyScript, AdvUseCtrl, AdvUseShift, AdvUseAlt, AdvUseWin, AdvWinCondition)
+        } else {
+            MsgBox, 48, خطأ, يرجى إدخال سكربت أو اختيار واحد من القائمة.
+            return
+        }
         if (NoFlxHotkeys.Count() > oldHotkeyCount || NoFlxHotkeys.HasKey(fullKey)) {
             GuiControl, CustomHotkeys:, AdvHotkeyKey,
             GuiControl, CustomHotkeys:, AdvHotkeyScript,
@@ -1230,6 +1118,7 @@ AddAdvHotkey:
             GuiControl, CustomHotkeys:, AdvUseShift, 0
             GuiControl, CustomHotkeys:, AdvUseAlt, 0
             GuiControl, CustomHotkeys:, AdvUseWin, 0
+            GuiControl, CustomHotkeys:, SelectedScript, % "|" GetScriptList()
             MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
         } else {
             MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
@@ -1247,7 +1136,7 @@ BrowseAdvAction:
 return
 
 OpenHotkeyManagerGUI:
-    global CustomHotkeys, AdvancedScripts, NoFlxHotkeys
+    global CustomHotkeys, AdvancedScripts, NoFlxHotkeys, scriptsDir
     Gui, HotkeyManager:Destroy
     Gui, HotkeyManager:Color, 2D2D2D
     Gui, HotkeyManager:Font, cFFFFFF s10, Segoe UI
@@ -1269,13 +1158,21 @@ OpenHotkeyManagerGUI:
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
         winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
-        LV_Add("", key, winCondition, script, "متقدم (Flx)")
+        fullPath := (InStr(script, "\") = 1 || InStr(script, ":") = 2) ? script : scriptsDir "\" script
+        displayScript := FileExist(fullPath) ? script : script . " (غير موجود)"
+        LV_Add("", key, winCondition, displayScript, "متقدم (Flx)")
     }
     for fullKey, action in NoFlxHotkeys {
         SplitKeyCond := StrSplit(fullKey, "|")
         key := StrReplace(SplitKeyCond[1], "VKBA", ";")
         winCondition := SplitKeyCond.Length() > 1 ? SplitKeyCond[2] : "غير محدد"
-        LV_Add("", key, winCondition, action, "بسيط (NoFlx)")
+        if (RegExMatch(action, "\.ahk$")) {
+            fullPath := (InStr(action, "\") = 1 || InStr(action, ":") = 2) ? action : scriptsDir "\" action
+            displayAction := FileExist(fullPath) ? action : action . " (غير موجود)"
+        } else {
+            displayAction := action
+        }
+        LV_Add("", key, winCondition, displayAction, "بسيط (NoFlx)")
     }
     LV_ModifyCol(1, 50)
     LV_ModifyCol(2, 100)
@@ -1886,7 +1783,7 @@ AddAdvancedScript(key, script, useCtrl := 0, useShift := 0, useAlt := 0, useWin 
 }
 
 AddNoFlxHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 0, winCondition := "") {
-    global iniFile, NoFlxHotkeys, HotkeyConditions
+    global iniFile, NoFlxHotkeys, HotkeyConditions, scriptsDir
     if (key = ";") {
         key := "VKBA"
     } else {
@@ -1894,6 +1791,62 @@ AddNoFlxHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 
     }
     modifierPrefix := (useCtrl ? "^" : "") . (useShift ? "+" : "") . (useAlt ? "!" : "") . (useWin ? "#" : "")
     fullKey := modifierPrefix . key . (winCondition ? "|" . winCondition : "")
+    
+    ; التحقق مما إذا كان الإجراء سكربتًا
+    if (InStr(action, "`n") || RegExMatch(action, "\.ahk$")) {
+        ; حالة السكربت الموجود مسبقًا (مسار ملف)
+        if (RegExMatch(action, "\.ahk$") && !InStr(action, "`n")) {
+            ; تحديد المسار الكامل
+            fullScriptPath := (InStr(action, "\") = 1 || InStr(action, ":") = 2) ? action : scriptsDir "\" action
+            if (!FileExist(fullScriptPath)) {
+                MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullScriptPath%
+                return
+            }
+            scriptPath := action  ; استخدام المسار كما هو
+        }
+        ; حالة كود سكربت يدوي (متعدد الأسطر)
+        else if (InStr(action, "`n")) {
+            defaultValue := key
+            InputBox, scriptName, إدخال اسم السكربت, أدخل اسمًا للسكربت (بدون .ahk):,, 300, 150,,,, %defaultValue%
+            if (ErrorLevel || scriptName = "") {
+                return
+            }
+            if (SubStr(scriptName, -3) != ".ahk") {
+                scriptName .= ".ahk"
+            }
+            scriptPath := "Scripts\" scriptName
+            fullScriptPath := scriptsDir "\" scriptName
+            
+            ; التحقق من عدم وجود تعارض في اسم السكربت
+            for existingKey, existingAction in NoFlxHotkeys {
+                if (existingAction = scriptPath && existingKey != fullKey) {
+                    MsgBox, 48, خطأ, اسم السكربت %scriptName% مستخدم بالفعل لاختصار آخر.`nيرجى اختيار اسم مختلف.
+                    return
+                }
+            }
+            
+            ; كتابة السكربت إلى ملف
+            FileDelete, %fullScriptPath%
+            FileAppend, %action%, %fullScriptPath%, UTF-8
+            if (ErrorLevel) {
+                MsgBox, 48, خطأ, فشل حفظ السكربت في: %fullScriptPath%
+                return
+            }
+        }
+        
+        ; التعامل مع استبدال السكربت القديم إذا كان موجودًا
+        if (NoFlxHotkeys.HasKey(fullKey)) {
+            oldAction := NoFlxHotkeys[fullKey]
+            if (RegExMatch(oldAction, "\.ahk$") && oldAction != scriptPath) {
+                FileDelete, % A_ScriptDir "\" oldAction
+            }
+            IniDelete, %iniFile%, NoFlx, %fullKey%
+        }
+        
+        action := scriptPath  ; تحديث الإجراء ليكون المسار
+    }
+    
+    ; التعامل مع الإجراءات البسيطة أو السكربتات
     if (NoFlxHotkeys.HasKey(fullKey)) {
         oldAction := NoFlxHotkeys[fullKey]
         MsgBox, 4, تحذير, المفتاح %key% مع شرط النافذة %winCondition% مستخدم بالفعل:`n%oldAction%`nهل تريد استبداله؟
@@ -1901,12 +1854,15 @@ AddNoFlxHotkey(key, action, useCtrl := 0, useShift := 0, useAlt := 0, useWin := 
             return
         DeleteNoFlxHotkey(fullKey)
     }
+    
     IniWrite, %action%, %iniFile%, NoFlx, %fullKey%
     NoFlxHotkeys[fullKey] := action
+    
     if (!HotkeyConditions.HasKey(modifierPrefix . key)) {
         HotkeyConditions[modifierPrefix . key] := {}
     }
     HotkeyConditions[modifierPrefix . key][fullKey] := winCondition
+    
     try {
         if (winCondition) {
             Hotkey, IfWinActive, %winCondition%
@@ -2060,27 +2016,6 @@ ExecuteSingleAction(action) {
 }
 
 ;------------------ Additional Hotkeys and Functions ------------------
-#IfWinActive ahk_class WorkerW
-~n::
-Send ^+!n
-return
-
-~z::
-Send ^+!z
-return
-
-~k::
-Send ^+!k
-return
-
-~m::
-Send ^+!m
-return
-
-~h::
-Send ^+!h
-return
-#IfWinActive
 
 ExecuteCustomXHotkey:
     global isSecureMode
@@ -2105,4 +2040,213 @@ ExecuteCustomXHotkey:
         Send, ^+!r
     }
     Process, Close, Telegram.exe
+return
+
+
+
+
+#======================================
+
+ToggleSecureMode() {
+    global isSecureMode, checkInterval, processNames, iniFile
+    isSecureMode := !isSecureMode
+    IniWrite, %isSecureMode%, %iniFile%, Settings, IsSecureMode
+    if (isSecureMode) {
+        WinGet, activeWindow, ID, A
+        Gui, SecureModeIndicator:Show, NoActivate
+        processList := StrSplit(processNames, ",")
+        for index, proc in processList {
+            Process, Exist, %proc%
+            if (ErrorLevel) {
+                Process, Close, %proc%
+            }
+        }
+        SetTimer, CheckSecureMode, %checkInterval%
+        WinActivate, ahk_id %activeWindow%
+    } else {
+        Gui, SecureModeIndicator:Hide
+        SetTimer, CheckSecureMode, Off
+    }
+}
+
+CheckSecureMode:
+    global isSecureMode, processNames
+    if (isSecureMode) {
+        processList := StrSplit(processNames, ",")
+        for index, proc in processList {
+            Process, Exist, %proc%
+            if (ErrorLevel) {
+                Process, Close, %proc%
+            }
+        }
+        CloseMonitoredFolders()
+    }
+return
+
+CloseMonitoredFolders() {
+    global monitoredFolders, monitoredFoldersWithSub, excludedFolders
+    shell := ComObjCreate("Shell.Application")
+    folderList := StrSplit(monitoredFolders, ",")
+    folderListWithSub := StrSplit(monitoredFoldersWithSub, ",")
+    excludedList := StrSplit(excludedFolders, ",")
+
+    for window in shell.Windows {
+        try {
+            windowFolder := window.document.Folder.Self.Path
+        } catch {
+            continue
+        }
+        currentFolder := Trim(windowFolder, " `t`r`n\\")
+        StringLower, currentFolder, currentFolder
+
+        ; التحقق من المجلدات المستثناة
+        for index, excluded in excludedList {
+            excluded := Trim(excluded, " `t`r`n\\")
+            StringLower, excluded, excluded
+            if (InStr(currentFolder, excluded) = 1) {
+                continue 2 ; تخطي هذه النافذة إذا كانت في مجلد مستثنى
+            }
+        }
+
+        ; التحقق من المجلدات المراقبة بدون تفرعات
+        for index, folder in folderList {
+            targetFolder := Trim(folder, " `t`r`n\\")
+            StringLower, targetFolder, targetFolder
+            if (currentFolder = targetFolder) {
+                window.Quit()
+                Sleep, 100
+                break
+            }
+        }
+
+        ; التحقق من المجلدات المراقبة مع تفرعاتها
+        for index, folder in folderListWithSub {
+            targetFolder := Trim(folder, " `t`r`n\\")
+            StringLower, targetFolder, targetFolder
+            if (InStr(currentFolder, targetFolder) = 1) {
+                window.Quit()
+                Sleep, 100
+                break
+            }
+        }
+    }
+}
+
+OpenSettings() {
+    global monitoredFolders, monitoredFoldersWithSub, processNames, checkInterval
+    Gui, GuiSettings:Destroy
+    Gui, GuiSettings:Color, 2D2D2D
+    Gui, GuiSettings:Font, cFFFFFF s10, Segoe UI
+    Gui, GuiSettings:Add, Text, x10 y10 w530 h30 Center cFFD700, إعدادات السكربت
+    Gui, GuiSettings:Add, Text, x10 y50 w200 h25, المجلدات المراقبة (بدون تفرعات):
+    Gui, GuiSettings:Add, Edit, x220 y50 w300 h25 vMonFolders c000000 Background424242, %monitoredFolders%
+    Gui, GuiSettings:Add, Button, x530 y50 w80 h25 gBrowseFolders, تصفح
+    Gui, GuiSettings:Add, Text, x10 y85 w200 h25, المجلدات المراقبة (مع تفرعات):
+    Gui, GuiSettings:Add, Edit, x220 y85 w300 h25 vMonFoldersWithSub c000000 Background424242, %monitoredFoldersWithSub%
+    Gui, GuiSettings:Add, Button, x530 y85 w80 h25 gBrowseFoldersWithSub, تصفح
+    Gui, GuiSettings:Add, Text, x10 y155 w200 h25, العمليات المراقبة (افصل بفواصل):
+    Gui, GuiSettings:Add, Edit, x220 y155 w300 h25 vProcNames c000000 Background424242, %processNames%
+    Gui, GuiSettings:Add, Button, x530 y155 w80 h25'gBrowseProcesses, تصفح
+    Gui, GuiSettings:Add, Text, x10 y120 w200 h25, المجلدات المستثناة (مع تفرعات):
+    Gui, GuiSettings:Add, Edit, x220 y120 w300 h25 vExclFolders c000000 Background424242, %excludedFolders%
+    Gui, GuiSettings:Add, Button, x530 y120 w80 h25 gBrowseExcludedFolders, تصفح
+    Gui, GuiSettings:Add, Text, x10 y190 w200 h25, فترة الفحص (بالملي ثانية):
+    Gui, GuiSettings:Add, Edit, x220 y190 w300 h25 vChkInterval c000000 Background424242, %checkInterval%
+    Gui, GuiSettings:Add, Button, x260 y235 w100 h30 gSaveSettings, حفظ
+    Gui, GuiSettings:Add, Button, x370 y235 w100 h30 gCancelSettings, إلغاء
+    Gui, GuiSettings:Font, cA0A0A0 s8
+    Gui, GuiSettings:Add, Text, x10 y275 w620 h20 Center, استخدم الفواصل لفصل المجلدات والعمليات، أو زر التصفح للإضافة
+    Gui, GuiSettings:Show, w630 h300, إعدادات السكربت
+    
+}
+
+; واجهة مؤشر وضع التسريع
+InitSecureModeIndicator() {
+    global isSecureMode, checkInterval
+    Gui, SecureModeIndicator:New, +LastFound +AlwaysOnTop +ToolWindow -Caption +E0x20
+    Gui, SecureModeIndicator:Color, 000000
+    WinSet, TransColor, 000000
+    Gui, SecureModeIndicator:Font, s12 cFFFFFF, Arial
+    Gui, SecureModeIndicator:Add, Text, BackgroundTrans, وضع التسريع
+    WinSet, Transparent, 150
+    ; تحديد الإحداثيات دائمًا
+    if (isSecureMode) {
+        Gui, SecureModeIndicator:Show, x0 y0 w100 h30 NoActivate
+        SetTimer, CheckSecureMode, %checkInterval%
+    } else {
+        ; تحديد الإحداثيات قبل الإخفاء لضمان الموقع الصحيح عند الإظهار لاحقًا
+        Gui, SecureModeIndicator:Show, x0 y0 w100 h30 NoActivate
+        Gui, SecureModeIndicator:Hide
+        SetTimer, CheckSecureMode, Off
+    }
+}
+
+
+BrowseFolders:
+    Gui, GuiSettings:Submit, NoHide
+    FileSelectFolder, selectedFolder, , 3, اختر مجلدًا للمراقبة
+    if (selectedFolder != "") {
+        if (MonFolders = "")
+            GuiControl, GuiSettings:, MonFolders, %selectedFolder%
+        else
+            GuiControl, GuiSettings:, MonFolders, %MonFolders%,%selectedFolder%
+    }
+return
+
+BrowseFoldersWithSub:
+    Gui, GuiSettings:Submit, NoHide
+    FileSelectFolder, selectedFolder, , 3, اختر مجلدًا للمراقبة مع تفرعاته
+    if (selectedFolder != "") {
+        if (MonFoldersWithSub = "")
+            GuiControl, GuiSettings:, MonFoldersWithSub, %selectedFolder%
+        else
+            GuiControl, GuiSettings:, MonFoldersWithSub, %MonFoldersWithSub%,%selectedFolder%
+    }
+return
+
+BrowseExcludedFolders:
+    Gui, GuiSettings:Submit, NoHide
+    FileSelectFolder, selectedFolder, , 3, اختر مجلدًا لاستثنائه
+    if (selectedFolder != "") {
+        if (ExclFolders = "")
+            GuiControl, GuiSettings:, ExclFolders, %selectedFolder%
+        else
+            GuiControl, GuiSettings:, ExclFolders, %ExclFolders%,%selectedFolder%
+    }
+return
+
+BrowseProcesses:
+    Gui, GuiSettings:Submit, NoHide
+    FileSelectFile, selectedFile, 3, , اختر عملية للمراقبة, Executable Files (*.exe)
+    if (selectedFile != "") {
+        SplitPath, selectedFile, fileName
+        if (ProcNames = "")
+            GuiControl, GuiSettings:, ProcNames, %fileName%
+        else
+            GuiControl, GuiSettings:, ProcNames, %ProcNames%,%fileName%
+    }
+return
+
+SaveSettings:
+    global monitoredFolders, monitoredFoldersWithSub, excludedFolders, processNames, checkInterval, iniFile
+    Gui, GuiSettings:Submit, NoHide
+    monitoredFolders := MonFolders
+    monitoredFoldersWithSub := MonFoldersWithSub
+    excludedFolders := ExclFolders
+    processNames := ProcNames
+    if (ChkInterval != "" && RegExMatch(ChkInterval, "^\d+$"))
+        checkInterval := ChkInterval
+    else {
+        MsgBox, 48, تحذير, يجب أن تكون فترة الفحص عددًا صحيحًا.
+    }
+    IniWrite, %monitoredFolders%, %iniFile%, Settings, MonitoredFolders
+    IniWrite, %monitoredFoldersWithSub%, %iniFile%, Settings, MonitoredFoldersWithSub
+    IniWrite, %excludedFolders%, %iniFile%, Settings, ExcludedFolders
+    IniWrite, %processNames%, %iniFile%, Settings, ProcessNames
+    IniWrite, %checkInterval%, %iniFile%, Settings, CheckInterval
+    Gui, GuiSettings:Destroy
+return
+
+CancelSettings:
+    Gui, GuiSettings:Destroy
 return
