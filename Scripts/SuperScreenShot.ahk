@@ -120,9 +120,9 @@ Exitapp
 BrowseMainFolder:
 Gui, 1:Submit, NoHide
 FileSelectFolder, SelectedFolder, , 3
-if SelectedFolder !=
+if (SelectedFolder != "")
     GuiControl, 1:, MainFolderPath, %SelectedFolder%
-Exitapp
+return
 
 SaveSettings:
 Gui, 1:Submit

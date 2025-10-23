@@ -1,2 +1,2 @@
-﻿Send, ^+{Left}{Del}
+﻿Send, {End}^+{home}{Del}
 return
