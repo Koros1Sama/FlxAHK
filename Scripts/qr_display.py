@@ -251,3 +251,11 @@ if __name__ == "__main__":
     window = QRWindow(qr_data, data, display_text, content_type, version)
     window.show()
     sys.exit(app.exec())
+    
+# FUTURE IMPROVEMENT:
+# For handling very long text inputs, consider integrating an automatic text hosting service
+# (like Pastebin or similar via their API). The idea is:
+# 1. Automatically upload the full text to the service.
+# 2. Retrieve a short URL pointing to that text.
+# 3. Generate the QR code from this short URL instead of the full text.
+# This would allow the QR code to remain scannable even for very large text blocks.
