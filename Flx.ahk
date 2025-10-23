@@ -41,7 +41,6 @@ try {
     Hotkey, % baseHotkey " & D", ToggleSecureMode, On
     Hotkey, % baseHotkey " & ,", OpenSettings, On
     Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
-    Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
 } catch e {
     MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
 }
@@ -211,7 +210,6 @@ try {
     Hotkey, % baseHotkey " & D", ToggleSecureMode, On
     Hotkey, % baseHotkey " & ,", OpenSettings, On
     Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
-    Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
 } catch e {
     MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
 }
@@ -516,7 +514,6 @@ ReloadHotkeys(oldBaseHotkey) {
         Hotkey, % baseHotkey " & D", ToggleSecureMode, On
         Hotkey, % baseHotkey " & ,", OpenSettings, On
         Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
-        Hotkey, % baseHotkey " & X", ExecuteCustomXHotkey, On
     } catch e {
         MsgBox, 48, خطأ, فشل إعادة تعريف الاختصارات الثابتة: %e%
     }
@@ -2016,36 +2013,6 @@ ExecuteSingleAction(action) {
 }
 
 ;------------------ Additional Hotkeys and Functions ------------------
-
-ExecuteCustomXHotkey:
-    global isSecureMode
-    if (!isSecureMode) {
-        ToggleSecureMode()
-    }
-    Send !^+x
-    IfWinActive, ahk_class Qt51515QWindowIcon
-    {
-        SendInput, #1
-        Sleep, 100
-    }
-    if WinActive("ahk_class Qt5QWindowIcon")
-    {
-        Run, "F:\D old\أبو هدهود\Fundamentals of Programming #Course 1\الدرس السادس_ اجزاء البايت ومصطلحاتها(360P).mp4"
-    }
-    if WinActive("ahk_class Chrome_WidgetWin_1")
-    {
-        Send, ^+!\
-        Sleep, 10
-        Sleep, 500
-        Send, ^+!r
-    }
-    Process, Close, Telegram.exe
-return
-
-
-
-
-#======================================
 
 ToggleSecureMode() {
     global isSecureMode, checkInterval, processNames, iniFile
