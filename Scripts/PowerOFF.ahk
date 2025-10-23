@@ -1,5 +1,4 @@
-﻿Send, ^+!z
-Sleep, 20
+﻿Sleep, 20
 WinGet, id, list
 Loop, %id%
 {

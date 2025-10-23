@@ -1,0 +1,114 @@
+
+=== C:/Users/KorosSama/Documents/GitHub/FlxAHK\Flx_Settings.ini ===
+
+[Settings]
+MonitoredFolders=
+ProcessNames=telegram.exe,ui32.exe
+CheckInterval=1000
+IsSecureMode=0
+MonitoredFoldersWithSub=D:\SteamLibrary\steamapps
+ExcludedFolders=
+[CustomHotkeys]
+L=Send 😂
+K=Send 😭
+J=Send ❤
+VKBA=Send 🤣
+SC028=Send 🌚
+T=Run C:\Users\KorosSama\AppData\Roaming\Telegram Desktop\Telegram.exe
+Backspace=Send, ^+{Left}{Del}
+M=WinMinimize, A
+R=Run E:\vs\AutoHotkey\Nigative\Flx.ahk
++Z=Run F:\D old\أبو هدهود\Fundamentals of Programming #Course 1\الدرس السادس_ اجزاء البايت ومصطلحاتها(360P).mp4
+W=Run explorer.exe shell:appsFolder\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App
+^V=Run E:\vs\AutoHotkey\Nigative
+F=Run C:\Program Files (x86)\Everything\Everything.exe
+S=Send 123123
++V=Run E:\vs\Anime\Mask\Packs\Abood
++T=Run C:\Users\Koros Sama\Desktop\Telegram\Telegram 1\Telegram.exe
+A=Run F:\Anime
+^+V=Run C:\Users\Koros Sama\Documents\GitHub
+U=Run http://127.0.0.1:8080/apex
+VK05=sleepByRClick.ahk
+V=send ^9
+2=Send littlefighter2turbo@gmail.com
+[AdvancedScripts]
+
+C=Scripts\langChanger.ahk
+I=Scripts\Transi.ahk
+P=Scripts\TransP.ahk
+ESC=Scripts\KillProses.ahk
+BACKSPACE=Scripts\DeleteLine.ahk
+M=Scripts\Minimize.ahk
+NUMPAD8=Scripts\VolumeUp.ahk
+NUMPAD2=Scripts\VolumeDown.ahk
+NUMPAD5=Scripts\PlayPause.ahk
+H=Scripts\SetTimer.ahk
+Z=Scripts\Zshort.ahk
+O=Scripts\TransO.ahk
+VK2C=Scripts\SuperScreenShot.ahk
+E=Scripts\RunPath.ahk
+C|ahk_exe Explorer.EXE=Scripts\CopyMove.ahk
+^+c=Scripts\CopyMove.ahk
+k|ahk_exe explorer.exe=Scripts\VlcPlayList.ahk
++VK05=Scripts\sleepByRClick.ahk
+VK05=Scripts\BrightnessDown.ahk
+VK06=Scripts\BrightnessUp.ahk
+^+#A=Scripts\PowerOFF.ahk
+q=Scripts\qr.ahk
+[NoFlx]
++!A=Send aa
+
+
+==================================================
+
+
+=== C:/Users/KorosSama/Documents/GitHub/FlxAHK\Scripts\FileOperations.ini ===
+
+[Settings]
+Action1=Move
+Path1=F:\Anime\Completed
+Action2=Move
+Path2=F:\Anime\The Rest
+Action3=Move
+Path3=F:\Anime\Watching
+Action4=Move
+Path4=F:\Anime\Soon
+Action5=Move
+Path5=F:\Anime\Dropped
+Action6=Create Shortcut
+Path6=F:\Anime
+Action7=Create Shortcut
+Path7=C:\Users\Koros Sama\Desktop
+Action8=Move
+Path8=F:\Anime
+Action9=Move
+Path9=F:\Anime\Same
+Action10=Move
+Path10=F:\Anime\Hidden\Pics
+Action11=Copy
+Path11=F:\Anime
+Action12=Copy
+Path12=F:\Anime
+
+
+==================================================
+
+
+=== C:/Users/KorosSama/Documents/GitHub/FlxAHK\Scripts\ScreenshotSettings.ini ===
+
+[Settings]
+MainFolder=C:\Users\Koros Sama\Pictures\Screenshots
+[Folders]
+Folder1=Folder1
+Folder2=أبو هدهود
+Folder3=Folder3
+Folder4=Folder4
+Folder5=Folder5
+Folder6=Folder6
+Folder7=Folder7
+Folder8=Folder8
+Folder9=Folder9
+
+
+==================================================
+

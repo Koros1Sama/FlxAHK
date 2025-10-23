@@ -2,7 +2,7 @@
 SetWorkingDir %A_ScriptDir%
 
 ; مسار VLC
-VLCPath := "C:\Program Files\VideoLAN\VLC\vlc.exe"
+VLCPath := "C:\Program Files (x86)\VideoLAN\VLC/vlc.exe"
 
 ; التحقق أولاً من المجلد المحدد عبر الحافظة
 FolderPath := GetFolderFromClipboard()
