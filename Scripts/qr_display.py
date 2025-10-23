@@ -1,7 +1,7 @@
 import sys
 import re
 from io import BytesIO
-import qrcode
+import segno
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -62,21 +62,22 @@ def prepare_data(text):
 
 
 def generate_qr(data, with_text=True, display_text=None):
-    qr = qrcode.QRCode(
-        version=None,  # Auto-determine the version
-        error_correction=qrcode.constants.ERROR_CORRECT_L,  # Low error correction for max capacity
-        box_size=10, 
-        border=4
-    )
-    qr.add_data(data)
-    qr.make(fit=True)
+    # Allow control over scale and error level (hardcoded for now, can be parameterized)
+    scale = 10
+    error = 'l'  # 'l' for low, max capacity; options: 'l', 'm', 'q', 'h'
+    
+    qr = segno.make(data, error=error, micro=False, boost_error=True)
     version = qr.version
-    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buffer = BytesIO()
+    qr.save(buffer, kind='png', scale=scale, border=4, dark='black', light='white')
+    buffer.seek(0)
+    img = Image.open(buffer)
     
     if with_text:
         if display_text is None:
             display_text = data
-        # Add URL text to the bottom white margin
+        # Add text to the bottom
         draw = ImageDraw.Draw(img)
         try:
             font = ImageFont.truetype("arialbd.ttf", 16)  # Bold Arial, larger size
@@ -92,12 +93,12 @@ def generate_qr(data, with_text=True, display_text=None):
                     except IOError:
                         font = ImageFont.load_default().font_variant(size=16)
         
-        # Truncate URL if too long
+        # Truncate if too long
         display_url = display_text
         bbox = draw.textbbox((0, 0), display_url, font=font)
         text_width = bbox[2] - bbox[0]
         img_width, img_height = img.size
-        max_text_width = img_width - 20  # Less margin for larger text
+        max_text_width = img_width - 20
         
         while text_width > max_text_width and len(display_url) > 10:
             display_url = display_url[:-1]
@@ -106,19 +107,16 @@ def generate_qr(data, with_text=True, display_text=None):
         if len(display_url) < len(display_text):
             display_url += "..."
         
-        # Text height
         text_height = bbox[3] - bbox[1]
-        
-        # Position: center bottom, within the border
         x = (img_width - text_width) / 2
-        y = img_height - text_height - 20  # More space from bottom
+        y = img_height - text_height - 20
         
         draw.text((x, y), display_url, font=font, fill="black")
     
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-    return buffer.getvalue(), version
+    final_buffer = BytesIO()
+    img.save(final_buffer, format='PNG', quality=95)  # High quality PNG
+    final_buffer.seek(0)
+    return final_buffer.getvalue(), version
 
 
 class QRLabel(QLabel):
@@ -157,7 +155,6 @@ class QRLabel(QLabel):
                 settings.setValue("last_dir", dir_path)
                 QMessageBox.information(self.window(), "Saved", "QR code saved successfully!")
             else:
-                # If canceled, do nothing
                 pass
         except Exception as e:
             QMessageBox.warning(self.window(), "Error", f"Failed to save QR code: {str(e)}")
@@ -166,7 +163,7 @@ class QRLabel(QLabel):
 class QRWindow(QMainWindow):
     def __init__(self, qr_image_data, data, display_text, content_type, version):
         super().__init__()
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)  # No Popup
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.display_text = display_text
         
         image = QImage.fromData(qr_image_data)
@@ -183,13 +180,13 @@ class QRWindow(QMainWindow):
         # Add type label
         type_label = QLabel(content_type + ":", self)
         type_label.setAlignment(Qt.AlignCenter)
-        type_label.setStyleSheet("QLabel { color: gray; font-size: 12px; }")  # Styling for type hint
+        type_label.setStyleSheet("QLabel { color: gray; font-size: 12px; }")
         
         # Add text label
         url_label = QLabel(display_text_truncated, self)
         url_label.setAlignment(Qt.AlignCenter)
-        url_label.setWordWrap(True)  # Wrap if too long
-        url_label.setStyleSheet("QLabel { color: black; font-weight: bold; font-size: 14px; }")  # Styling
+        url_label.setWordWrap(True)
+        url_label.setStyleSheet("QLabel { color: black; font-weight: bold; font-size: 14px; }")
         
         layout = QVBoxLayout()
         layout.addWidget(qr_label)
@@ -204,15 +201,15 @@ class QRWindow(QMainWindow):
         
         # Adaptive scaling based on QR version
         screen = QApplication.primaryScreen().availableGeometry()
-        modules = 21 + 4 * (version - 1)
-        target_size = (modules + 8) * 10  # Include border for consistent module size
+        modules = 21 + 4 * (version - 1) if isinstance(version, int) else 21  # Fallback for Micro
+        target_size = (modules + 8) * 10  # Include border (4*2)
         max_size = min(screen.width() * 0.8, screen.height() * 0.8)
         display_size = min(target_size, max_size)
         
         qr_label.setPixmap(pixmap.scaled(display_size, display_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         
         # Adjust window size
-        self.resize(display_size + 20, display_size + 100)  # Extra space for labels and margins
+        self.resize(display_size + 20, display_size + 100)
         self.move((screen.width() - self.width()) // 2, (screen.height() - self.height()) // 2)
     
     def keyPressEvent(self, event: QKeyEvent):
@@ -221,7 +218,7 @@ class QRWindow(QMainWindow):
     
     def closeEvent(self, event):
         super().closeEvent(event)
-        QApplication.quit()  # Explicitly quit the app
+        QApplication.quit()
     
     def changeEvent(self, event):
         if event.type() == QEvent.ActivationChange:
@@ -240,15 +237,15 @@ if __name__ == "__main__":
     data, display_text, content_type = prepare_data(clipboard_text)
     
     if not data:
-        sys.exit(1)  # Exit silently if no data
+        sys.exit(1)
     
     try:
         qr_data, version = generate_qr(data, with_text=False)
-    except ValueError as e:
-        if "Invalid version" in str(e):
-            QMessageBox.critical(None, "Error", "The text is too long to generate a QR code. Please shorten it.")
-        else:
-            QMessageBox.critical(None, "Error", f"Failed to generate QR code: {str(e)}")
+    except segno.DataOverflowError:
+        QMessageBox.critical(None, "Error", "The text is too long to generate a single QR code. Please shorten it or consider splitting.")
+        sys.exit(1)
+    except Exception as e:
+        QMessageBox.critical(None, "Error", f"Failed to generate QR code: {str(e)}")
         sys.exit(1)
     
     window = QRWindow(qr_data, data, display_text, content_type, version)
