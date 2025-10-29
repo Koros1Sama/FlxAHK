@@ -35,16 +35,6 @@ if (!baseHotkey || baseHotkey = "ERROR") {
 ; إعادة تعريف الاختصارات بناءً على baseHotkey
 ReloadHotkeys("")  ; استدعاء ReloadHotkeys بدون oldBaseHotkey لأنه التحميل الأولي
 
-; تعريف الاختصارات الثابتة (للتأكد فقط)
-try {
-    Hotkey, %baseHotkey%, OpenInteractiveMode, On
-    Hotkey, % baseHotkey " & D", ToggleSecureMode, On
-    Hotkey, % baseHotkey " & ,", OpenSettings, On
-    Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
-} catch e {
-    MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
-}
-
 ; تحميل الاختصارات البسيطة مع شروط النافذة
 CustomHotkeys := {}
 IniRead, customKeys, %iniFile%, CustomHotkeys
@@ -204,15 +194,6 @@ ExecuteNoFlxHotkeyConditional:
 return
 
 ;------------------ Hotkeys ------------------
-; تعريف الاختصارات الثابتة باستخدام baseHotkey
-try {
-    Hotkey, %baseHotkey%, OpenInteractiveMode, On
-    Hotkey, % baseHotkey " & D", ToggleSecureMode, On
-    Hotkey, % baseHotkey " & ,", OpenSettings, On
-    Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
-} catch e {
-    MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
-}
 
 ; تعريف الاختصار الإضافي Ctrl+Win+=
 ^#+=::
@@ -510,13 +491,14 @@ ReloadHotkeys(oldBaseHotkey) {
     }
     ; تفعيل الاختصارات الثابتة الجديدة
     try {
-        Hotkey, %baseHotkey%, OpenInteractiveMode, On
-        Hotkey, % baseHotkey " & D", ToggleSecureMode, On
-        Hotkey, % baseHotkey " & ,", OpenSettings, On
-        Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
-    } catch e {
-        MsgBox, 48, خطأ, فشل إعادة تعريف الاختصارات الثابتة: %e%
-    }
+    Hotkey, %baseHotkey%, BaseHotkeyLabel, On
+    Hotkey, % baseHotkey " & -", OpenInteractiveMode, On
+    Hotkey, % baseHotkey " & D", ToggleSecureMode, On
+    Hotkey, % baseHotkey " & ,", OpenSettings, On
+    Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
+} catch e {
+    MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
+}
 }
 
 DetectKey:
@@ -2217,3 +2199,15 @@ return
 CancelSettings:
     Gui, GuiSettings:Destroy
 return
+
+
+BaseHotkeyLabel:
+    WinGetClass, active_class, A
+    if (active_class = "Progman" || active_class = "WorkerW") {
+        Gosub, PressN
+    } else {
+        Gosub, OpenInteractiveMode
+    }
+return
+PressN:
+    send, ^+!n
