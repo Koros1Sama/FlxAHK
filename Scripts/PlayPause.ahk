@@ -1,2 +1,2 @@
-﻿Send, {Media_Play_Pause}
-return
+Send, {Media_Play_Pause}
+ExitApp

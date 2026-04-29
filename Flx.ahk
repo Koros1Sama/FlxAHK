@@ -1,8 +1,9 @@
-﻿#SingleInstance force
+#SingleInstance force
 #Persistent
 #NoEnv
 #UseHook On          ; لتحسين أداء الاختصارات المعقدة
 #InstallKeybdHook    ; لضمان تتبع المفاتيح بشكل جيد
+#Warn                ; لتتبع المتغيرات غير المعرفة والأخطاء المحتملة
 ;------------------ Global Settings ------------------
 iniFile := A_ScriptDir "\Flx_Settings.ini"
 scriptsDir := A_ScriptDir "\Scripts"

@@ -98,8 +98,8 @@ AccepterLoop:
         if (!ErrorLevel)
         {
             ; Found Retry -> check internet
-            RunWait, %ComSpec% /c ping -n 1 -w 1000 8.8.8.8 >nul 2>nul, , Hide UseErrorLevel
-            if (ErrorLevel = 0)
+            Connected := DllCall("Wininet.dll\InternetCheckConnection", "Str", "http://www.google.com", "UInt", 1, "UInt", 0)
+            if (Connected)
             {
                 ; Internet OK -> click Retry
                 ClickX := Rtx + 10

@@ -1,2 +1,2 @@
-﻿WinMinimize, A
-return
+WinMinimize, A
+ExitApp
