@@ -1,0 +1,4 @@
+[20:13:31] === Accepter FINAL started ===
+[20:13:31] Screen: 1920x1080
+[20:13:31] Retry pos: (1866, 915)
+[20:13:31] Interval: 3s
