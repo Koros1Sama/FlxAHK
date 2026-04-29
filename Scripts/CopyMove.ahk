@@ -9,7 +9,7 @@ Loop, 12  ; Increased to 12 to include *, /, +
 
 ; Define valid keys including new symbols
 ValidKeys := "0123456789*/+"
-Input, Key, L1 T3, %ValidKeys%
+Input, Key, L1 T3
 if (ErrorLevel = "Timeout")
     ExitApp
 

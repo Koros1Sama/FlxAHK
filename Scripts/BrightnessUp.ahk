@@ -3,14 +3,9 @@ newBrightness := brightness + 10
 if (newBrightness > 100)
     newBrightness := 100
 SetBrightness(newBrightness)
-Tooltip, تم رفع السطوع إلى %newBrightness%`
-SetTimer, RemoveTooltip, -1000
-return
-
-RemoveTooltip:
-    Tooltip
-return
-
+ToolTip, تم رفع السطوع إلى %newBrightness%`%
+Sleep, 1000
+ExitApp
 GetBrightness() {
     objWMIService := ComObjGet("winmgmts:\\.\root\WMI")
     colItems := objWMIService.ExecQuery("Select * from WmiMonitorBrightness")

@@ -1,2 +1,2 @@
-﻿SoundSet, -5
-return
+SoundSet, -5
+ExitApp

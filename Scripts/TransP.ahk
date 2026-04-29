@@ -1,2 +1,2 @@
-﻿WinSet, Transparent, 0, A
-return
+WinSet, Transparent, 0, A
+ExitApp
