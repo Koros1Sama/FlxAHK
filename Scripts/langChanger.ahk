@@ -1,4 +1,4 @@
-ClipSaved := ClipboardAll
+﻿ClipSaved := ClipboardAll
 Clipboard := ""
 Send, ^c
 Sleep, 100
