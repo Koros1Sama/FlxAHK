@@ -1,4 +1,4 @@
-#NoEnv
+﻿#NoEnv
 #SingleInstance Off
 DetectHiddenWindows, On
 CoordMode, Pixel, Screen
@@ -40,7 +40,7 @@ SetTimer, AccepterLoop, %DelayTime%
 return
 
 AccepterLoop:
-    ; Make sure Antigravity is running
+    ; Make sure Antigravity is running (any window - Manager or widget_test)
     IfWinNotExist, ahk_exe Antigravity.exe
         return
 
@@ -52,10 +52,7 @@ AccepterLoop:
         {
             ClickX := Ax + 10
             ClickY := Ay + 10
-            WinActivate, ahk_exe Antigravity.exe
-            Sleep, 200
-            Click, %ClickX%, %ClickY%
-            Sleep, 1500
+            Gosub, ActivateAndClick
         }
     }
 
@@ -68,10 +65,7 @@ AccepterLoop:
         {
             ClickX := AxAlt + 10
             ClickY := AyAlt + 10
-            WinActivate, ahk_exe Antigravity.exe
-            Sleep, 200
-            Click, %ClickX%, %ClickY%
-            Sleep, 1500
+            Gosub, ActivateAndClick
         }
     }
 
@@ -84,10 +78,7 @@ AccepterLoop:
         {
             ClickX := Rx + 10
             ClickY := Ry + 10
-            WinActivate, ahk_exe Antigravity.exe
-            Sleep, 200
-            Click, %ClickX%, %ClickY%
-            Sleep, 1500
+            Gosub, ActivateAndClick
         }
     }
 
@@ -104,13 +95,35 @@ AccepterLoop:
                 ; Internet OK -> click Retry
                 ClickX := Rtx + 10
                 ClickY := Rty + 10
-                WinActivate, ahk_exe Antigravity.exe
-                Sleep, 200
-                Click, %ClickX%, %ClickY%
-                Sleep, 1500
+                Gosub, ActivateAndClick
             }
         }
     }
+return
+
+; --- Helper: Activate the correct window under the button and click ---
+; Uses the button coordinates to find which Antigravity window owns that area
+ActivateAndClick:
+    ; Find which window is at the button's position
+    ; This correctly handles multiple windows from the same exe (Manager vs widget_test)
+    MouseGetPos_hwnd := DllCall("WindowFromPoint", "Int", ClickX, "Int", ClickY, "Ptr")
+    if (MouseGetPos_hwnd)
+    {
+        ; Get the top-level parent window
+        DllCall("GetAncestor", "Ptr", MouseGetPos_hwnd, "UInt", 2, "Ptr")
+        TopHwnd := DllCall("GetAncestor", "Ptr", MouseGetPos_hwnd, "UInt", 2, "Ptr")
+        if (TopHwnd)
+        {
+            WinActivate, ahk_id %TopHwnd%
+            Sleep, 200
+            Click, %ClickX%, %ClickY%
+            Sleep, 1500
+            return
+        }
+    }
+    ; Fallback: just click directly (button is already visible on screen)
+    Click, %ClickX%, %ClickY%
+    Sleep, 1500
 return
 
 GuiClose:

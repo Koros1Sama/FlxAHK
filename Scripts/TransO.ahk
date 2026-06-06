@@ -1,4 +1,4 @@
-WinGet, TransLevel, Transparent, A
+﻿WinGet, TransLevel, Transparent, A
 if (TransLevel = "") {
     TransLevel := 255
 }

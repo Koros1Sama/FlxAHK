@@ -1,4 +1,4 @@
-#SingleInstance Force
+﻿#SingleInstance Force
 #Persistent
 
 SetTimer, CheckTime, 2000

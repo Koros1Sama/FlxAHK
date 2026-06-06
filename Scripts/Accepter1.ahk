@@ -1,4 +1,4 @@
-#NoEnv
+﻿#NoEnv
 #SingleInstance Off ; ضروري جداً لكي يسمح لنا بفحص إذا كان السكربت شغالاً من قبل
 DetectHiddenWindows, On
 

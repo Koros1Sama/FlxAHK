@@ -13,8 +13,15 @@ if (TargetPath = "" || !FileExist(TargetPath)) {
 ; التحقق إذا كان المسار هو سطح المكتب أو لم يتم تحديد شيء
 if (TargetPath = "" || TargetPath = A_Desktop || TargetPath = A_DesktopCommon || InStr(TargetPath, "Desktop")) {
     IniRead, LastActiveFolder, %HistoryFile%, Global, LastActiveFolder, %A_Space%
+    
     if (LastActiveFolder != "" && FileExist(LastActiveFolder)) {
-        TargetPath := LastActiveFolder
+        ; إذا كان مشغل VLC مفتوحاً بالفعل، يتغير السلوك ليقوم بفتح المجلد بدلاً من التشغيل
+        if WinExist("ahk_exe vlc.exe") {
+            Run, "%LastActiveFolder%"
+            ExitApp
+        } else {
+            TargetPath := LastActiveFolder
+        }
     } else {
         MsgBox, لم يتم العثور على سجل لأنمي سابق لفتحه من سطح المكتب!
         ExitApp

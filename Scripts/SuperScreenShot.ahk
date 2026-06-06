@@ -20,10 +20,10 @@ if (Key = "0")
 {
     Gui, 1:Destroy
     Gui, 1:+AlwaysOnTop
-    Gui, 1:Add, Text,, Main Folder Path:
+    Gui, 1:Add, Text,, مسار المجلد الرئيسي:
     Gui, 1:Add, Edit, vMainFolderPath w300, %MainFolder%
-    Gui, 1:Add, Button, gBrowseMainFolder, Browse
-    Gui, 1:Add, Text,, Folder Names:
+    Gui, 1:Add, Button, gBrowseMainFolder, تصفح
+    Gui, 1:Add, Text,, أسماء المجلدات:
     Gui, 1:Add, Text,, NumPad1:
     Gui, 1:Add, Edit, vFolder1 w200, %Folder1%
     Gui, 1:Add, Text,, NumPad2:
@@ -42,8 +42,8 @@ if (Key = "0")
     Gui, 1:Add, Edit, vFolder8 w200, %Folder8%
     Gui, 1:Add, Text,, NumPad9:
     Gui, 1:Add, Edit, vFolder9 w200, %Folder9%
-    Gui, 1:Add, Button, gSaveSettings Default, Save
-    Gui, 1:Add, Button, gCancelSettings, Cancel
+    Gui, 1:Add, Button, gSaveSettings Default, حفظ
+    Gui, 1:Add, Button, gCancelSettings, إلغاء
     Gui, 1:Show
     return
 }
@@ -63,14 +63,14 @@ if (Key >= "1" && Key <= "9")
     pToken := Gdip_Startup()
     if !pToken
     {
-        MsgBox, GDI+ failed to start. Please ensure Gdip.ahk is in %A_ScriptDir%.
+        MsgBox, 16, خطأ, فشل في بدء تشغيل GDI+. يرجى التأكد من وجود Gdip.ahk في %A_ScriptDir%.
         ExitApp
     }
     
     pBitmap := Gdip_BitmapFromScreen("0|0|" . A_ScreenWidth . "|" . A_ScreenHeight)
     if !pBitmap
     {
-        MsgBox, Failed to capture screen.
+        MsgBox, 16, خطأ, فشل في التقاط الشاشة.
         Gdip_Shutdown(pToken)
         ExitApp
     }
@@ -162,7 +162,7 @@ if (OldMainFolder != MainFolderPath && InStr(FileExist(OldMainFolder), "D"))
 {
     FileMoveDir, %OldMainFolder%, %MainFolderPath%, R
     if (ErrorLevel)
-        MsgBox, Failed to rename main folder from %OldMainFolder% to %MainFolderPath%. ErrorLevel: %ErrorLevel%
+        MsgBox, 16, خطأ, فشل في إعادة تسمية المجلد الرئيسي من %OldMainFolder% إلى %MainFolderPath%. رمز الخطأ: %ErrorLevel%
 }
 
 OldFolders := [OldFolder1, OldFolder2, OldFolder3, OldFolder4, OldFolder5, OldFolder6, OldFolder7, OldFolder8, OldFolder9]
@@ -179,7 +179,7 @@ Loop, 9
     {
         FileMoveDir, %OldPath%, %NewPath%, R
         if (ErrorLevel)
-            MsgBox, Failed to rename folder from %OldPath% to %NewPath%. ErrorLevel: %ErrorLevel%
+            MsgBox, 16, خطأ, فشل في إعادة تسمية المجلد من %OldPath% إلى %NewPath%. رمز الخطأ: %ErrorLevel%
     }
 }
 

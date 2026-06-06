@@ -1,15 +1,19 @@
-#SingleInstance force
+﻿#SingleInstance force
 #Persistent
 #NoEnv
 #UseHook On          ; لتحسين أداء الاختصارات المعقدة
 #InstallKeybdHook    ; لضمان تتبع المفاتيح بشكل جيد
 #Warn                ; لتتبع المتغيرات غير المعرفة والأخطاء المحتملة
+#Warn LocalSameAsGlobal, Off ; إخفاء تحذيرات المتغيرات المحلية اللي تتطابق مع جلوبال
 ;------------------ Global Settings ------------------
 iniFile := A_ScriptDir "\Flx_Settings.ini"
 scriptsDir := A_ScriptDir "\Scripts"
 if !FileExist(scriptsDir) {
     FileCreateDir, %scriptsDir%
 }
+CustomHotkeys := {}
+AdvancedScripts := {}
+NoFlxHotkeys := {}
 HotkeyConditions := {} ; لتتبع شروط NoFlxHotkeys
 
 IniRead, monitoredFolders, %iniFile%, Settings, MonitoredFolders, F:\Anime,F:\Movies
@@ -33,11 +37,7 @@ if (!baseHotkey || baseHotkey = "ERROR") {
     IniWrite, %baseHotkey%, %iniFile%, HotkeySettings, BaseKey
 }
 
-; إعادة تعريف الاختصارات بناءً على baseHotkey
-ReloadHotkeys("")  ; استدعاء ReloadHotkeys بدون oldBaseHotkey لأنه التحميل الأولي
-
 ; تحميل الاختصارات البسيطة مع شروط النافذة
-CustomHotkeys := {}
 IniRead, customKeys, %iniFile%, CustomHotkeys
 if (customKeys = "ERROR") {
     customKeys := ""
@@ -72,7 +72,6 @@ Loop, Parse, customKeys, `n
 }
 
 ; تحميل السكربتات المتقدمة مع شروط النافذة
-AdvancedScripts := {}
 IniRead, advScripts, %iniFile%, AdvancedScripts
 if (advScripts = "ERROR") {
     advScripts := ""
@@ -112,8 +111,6 @@ Loop, Parse, advScripts, `n
 }
 
 ; تحميل الاختصارات بدون Flx مع شروط النافذة
-NoFlxHotkeys := {}
-HotkeyConditions := {}
 IniRead, noFlxKeys, %iniFile%, NoFlx
 if (noFlxKeys = "ERROR") {
     noFlxKeys := ""
@@ -156,6 +153,9 @@ Loop, Parse, noFlxKeys, `n
         }
     }
 }
+
+; إعادة تعريف الاختصارات بناءً على baseHotkey (بعد تحميل جميع البيانات من الإعدادات)
+ReloadHotkeys("")  ; استدعاء ReloadHotkeys بدون oldBaseHotkey لأنه التحميل الأولي
 
 ; تنفيذ الاختصارات بدون Flx مع التحقق من الشرط
 ExecuteNoFlxHotkeyConditional:
@@ -705,41 +705,6 @@ return
 
 CancelAppInput:
     Gui, AppInput:Destroy
-return
-    FileSelectFile, selectedFile, 3, , اختر تطبيقًا لفتحه, Executable Files (*.exe)
-    if (selectedFile != "") {
-        if (UseFlx) {
-            oldHotkeyCount := CustomHotkeys.Count()
-            AddHotkey(HotkeyKey, "Run " . selectedFile, UseCtrl, UseShift, UseAlt, UseWin, UseFlx, WinCondition)
-            if (CustomHotkeys.Count() > oldHotkeyCount || CustomHotkeys.HasKey(fullKey)) {
-                GuiControl, CustomHotkeys:, HotkeyKey,
-                GuiControl, CustomHotkeys:, WinCondition,
-                GuiControl, CustomHotkeys:, UseFlx, 1
-                GuiControl, CustomHotkeys:, UseCtrl, 0
-                GuiControl, CustomHotkeys:, UseShift, 0
-                GuiControl, CustomHotkeys:, UseAlt, 0
-                GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار بنجاح!
-            } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار.
-            }
-        } else {
-            oldHotkeyCount := NoFlxHotkeys.Count()
-            AddNoFlxHotkey(HotkeyKey, "Run " . selectedFile, UseCtrl, UseShift, UseAlt, UseWin, WinCondition)
-            if (NoFlxHotkeys.Count() > oldHotkeyCount || NoFlxHotkeys.HasKey(fullKey)) {
-                GuiControl, CustomHotkeys:, HotkeyKey,
-                GuiControl, CustomHotkeys:, WinCondition,
-                GuiControl, CustomHotkeys:, UseFlx, 1
-                GuiControl, CustomHotkeys:, UseCtrl, 0
-                GuiControl, CustomHotkeys:, UseShift, 0
-                GuiControl, CustomHotkeys:, UseAlt, 0
-                GuiControl, CustomHotkeys:, UseWin, 0
-                MsgBox, 64, تم, تمت إضافة الاختصار بدون Flx بنجاح!
-            } else {
-                MsgBox, 48, خطأ, فشل إضافة الاختصار بدون Flx.
-            }
-        }
-    }
 return
 
 OpenTextInput:

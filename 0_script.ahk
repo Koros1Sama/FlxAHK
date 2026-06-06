@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 #SingleInstance Force
 ;------------------ Global Settings ------------------
 iniFile := A_ScriptDir . "\Flx_Settings.ini"

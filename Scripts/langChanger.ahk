@@ -1,4 +1,4 @@
-; === Language Changer (Encoding-Independent) ===
+﻿; === Language Changer (Encoding-Independent) ===
 ; All Arabic characters are defined via Chr(0xHEX) codepoints
 ; so this script works regardless of file encoding (BOM, no-BOM, ANSI, etc.)
 

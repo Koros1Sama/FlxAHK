@@ -1,4 +1,4 @@
-#SingleInstance Force
+﻿#SingleInstance Force
 
 ; Load settings from INI file
 Loop, 12  ; Increased to 12 to include *, /, +
@@ -20,25 +20,25 @@ if (!InStr(ValidKeys, Key))
 if (Key = "0")
 {
     ; Settings GUI with single column, Browse next to Action dropdown
-    Gui, Settings:New, +AlwaysOnTop, Button Settings
-    Gui, Add, Text, x160 y8, Configure action and path for each button
+    Gui, Settings:New, +AlwaysOnTop, إعدادات الأزرار
+    Gui, Add, Text, x160 y8, إعداد الإجراء والمسار لكل زر
     
     ; Define button labels including new symbols
-    ButtonLabels := ["NumPad1", "NumPad2", "NumPad3", "NumPad4", "NumPad5", "NumPad6", "NumPad7", "NumPad8", "NumPad9", "Multiply(*)", "Divide(/)", "Add(+)"]
+    ButtonLabels := ["NumPad1", "NumPad2", "NumPad3", "NumPad4", "NumPad5", "NumPad6", "NumPad7", "NumPad8", "NumPad9", "ضرب(*)", "قسمة(/)", "جمع(+)"]
     
     Loop, 12  ; Increased to 12 to include *, /, +
     {
         yPos := 30 + (A_Index - 1) * 40
         Gui, Add, Text, x10 y%yPos% w80, % ButtonLabels[A_Index] ":"
-        Gui, Add, DropDownList, x90 y%yPos% vAction%A_Index% w100, Copy|Move|Create Shortcut
+        Gui, Add, DropDownList, x90 y%yPos% vAction%A_Index% w100, نسخ|نقل|إنشاء اختصار
         GuiControl, ChooseString, Action%A_Index%, % Action%A_Index%
-        Gui, Add, Button, x200 y%yPos% gBrowse%A_Index%, Browse
+        Gui, Add, Button, x200 y%yPos% gBrowse%A_Index%, تصفح
         Gui, Add, Edit, x280 y%yPos% vPath%A_Index% w250, % Path%A_Index%
     }
     
     ; Save and Cancel buttons at the bottom
-    Gui, Add, Button, x200 y505 w80 gSaveSettings Default, Save  ; Adjusted Y position
-    Gui, Add, Button, x300 y505 w80 gCancelSettings, Cancel     ; Adjusted Y position
+    Gui, Add, Button, x200 y505 w80 gSaveSettings Default, حفظ  ; Adjusted Y position
+    Gui, Add, Button, x300 y505 w80 gCancelSettings, إلغاء     ; Adjusted Y position
     Gui, Show, w550 h540  ; Increased height to accommodate new rows
     return
 }
@@ -131,7 +131,7 @@ if (Num >= 1 && Num <= 12)
                         Gosub, SkipAction
                 }
                 else {
-                    ShowDuplicateDialog(ItemName, (ItemExt != "" ? "File" : "Folder"))
+                    ShowDuplicateDialog(ItemName, (ItemExt != "" ? "ملف" : "مجلد"))
                 }
             }
             else
@@ -240,13 +240,13 @@ return
 
 ProcessItem(Source, Dest) {
     global ChosenOperation, ProcessedBytes, ItemExt
-    if (ChosenOperation = "Copy") {
+    if (ChosenOperation = "Copy" || ChosenOperation = "نسخ") {
         if (ItemExt != "")
             CopyFileWithProgress(Source, Dest)
         else
             CopyFolderWithProgress(Source, Dest)
     }
-    else if (ChosenOperation = "Move") {
+    else if (ChosenOperation = "Move" || ChosenOperation = "نقل") {
         if (ItemExt != "") {
             FileMove, %Source%, %Dest%, 1
             FileGetSize, FileSize, %Source%
@@ -261,7 +261,7 @@ ProcessItem(Source, Dest) {
         Progress, %ProcessedBytes%
         Sleep, 10
     }
-    else if (ChosenOperation = "Create Shortcut") {
+    else if (ChosenOperation = "Create Shortcut" || ChosenOperation = "إنشاء اختصار") {
         if (ItemExt != "")
             FileCreateShortcut, %Source%, %Dest%.lnk
         else
@@ -308,13 +308,13 @@ CopyFolderWithProgress(Source, Dest) {
 }
 
 ShowDuplicateDialog(ItemName, ItemType) {
-    Gui, Duplicate:New, +AlwaysOnTop, %ItemType% Exists
-    Gui, Add, Text,, The %ItemType% %ItemName% already exists
-    Gui, Add, Button, x10 y50 w70 h30 gReplaceAction, Replace
-    Gui, Add, Button, x85 y50 w70 h30 gRenameAction, Rename
-    Gui, Add, Button, x160 y50 w70 h30 gCancelAction, Skip
-    Gui, Add, Button, x235 y50 w70 h30 gCancelAllAction, Cancel All
-    Gui, Add, Checkbox, x10 y90 w290 h20 vApplyToAll, Apply this choice to all duplicate items
+    Gui, Duplicate:New, +AlwaysOnTop, العنصر موجود بالفعل
+    Gui, Add, Text,, الـ %ItemType% %ItemName% موجود بالفعل
+    Gui, Add, Button, x10 y50 w70 h30 gReplaceAction, استبدال
+    Gui, Add, Button, x85 y50 w70 h30 gRenameAction, إعادة تسمية
+    Gui, Add, Button, x160 y50 w70 h30 gCancelAction, تخطي
+    Gui, Add, Button, x235 y50 w70 h30 gCancelAllAction, إلغاء الكل
+    Gui, Add, Checkbox, x10 y90 w290 h20 vApplyToAll, تطبيق هذا الخيار على جميع العناصر المتكررة
     Gui, Show, w320 h120
-    WinWaitClose, %ItemType% Exists
+    WinWaitClose, العنصر موجود بالفعل
 }

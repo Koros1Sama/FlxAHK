@@ -1,4 +1,4 @@
-brightness := GetBrightness()
+﻿brightness := GetBrightness()
 newBrightness := brightness + 10
 if (newBrightness > 100)
     newBrightness := 100

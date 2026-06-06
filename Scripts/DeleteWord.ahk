@@ -1,2 +1,2 @@
-Send, ^+{Left}{Del}
+﻿Send, ^+{Left}{Del}
 ExitApp
