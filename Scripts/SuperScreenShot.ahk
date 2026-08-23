@@ -76,6 +76,7 @@ if (Key >= "1" && Key <= "9")
     }
     
     Gdip_SaveBitmapToFile(pBitmap, FileName)
+    Gdip_SetBitmapToClipboard(pBitmap)
     Gdip_DisposeImage(pBitmap)
     Gdip_Shutdown(pToken)
 

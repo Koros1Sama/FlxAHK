@@ -37,7 +37,7 @@ if (SelectedText = "")
     {
         Clipboard := ClipSaved
         gosub, ResumeClipMonitors
-        return
+        ExitApp
     }
 }
 
@@ -151,7 +151,7 @@ gosub, ResumeClipMonitors
 
 ; كتابة النص مباشرة بدل استخدام اللصق عشان ما ينحفظ في الحافظة
 SendInput, {Text}%NewText%
-return
+ExitApp
 
 ; --- Subroutine: إعادة تشغيل مراقبي الحافظة ---
 ResumeClipMonitors:

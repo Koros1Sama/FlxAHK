@@ -4,11 +4,11 @@ DetectHiddenWindows, On
 
 ; --- الكشف عن النسخة السابقة ---
 ; نبحث عن النافذة التي أنشأناها باسم معين
-IfWinExist, MyUniqueStatus_ON_Indicator
+IfWinExist, MyUniqueStatus_ON_Accepter1
 {
     ; إذا وجدت النافذة، فهذا يعني أن السكربت شغال
     ; نقوم بإغلاق النافذة (وهذا سيغلق السكربت السابق)
-    WinClose, MyUniqueStatus_ON_Indicator
+    WinClose, MyUniqueStatus_ON_Accepter1
     ; ثم نغلق هذه النسخة الحالية فوراً
     ExitApp
 }
@@ -24,7 +24,7 @@ Gui, Color, 00FF00
 Gui, Font, s12 Bold, Segoe UI
 Gui, Add, Text, cBlack Center, ON
 ; نعطي النافذة اسماً مميزاً لنبحث عنه عند التشغيل القادم
-Gui, Show, x0 y0 NoActivate, MyUniqueStatus_ON_Indicator
+Gui, Show, x0 y0 NoActivate, MyUniqueStatus_ON_Accepter1
 
 ; بدء الضغط
 SetTimer, PressMyKeys, %DelayTime%

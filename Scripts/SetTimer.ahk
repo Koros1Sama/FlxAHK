@@ -4,4 +4,4 @@ if (ErrorLevel = 0 && Minutes > 0)
     Sleep, % Minutes * 60000
     MsgBox, يا كوروس، كمل الوقت!
 }
-return
+ExitApp

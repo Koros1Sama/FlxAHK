@@ -113,7 +113,7 @@ if (Num >= 1 && Num <= 12)
         
         IfExist, %ItemToCopy%
         {
-            SplitPath, ItemToCopy, ItemName,, ItemExt
+            SplitPath, ItemToCopy, ItemName,, ItemExt, ItemNameNoExt
             
             ; Handle both files and folders
             TargetItem := TargetPath . "\" . ItemName
@@ -226,11 +226,13 @@ if (ApplyToAll)
 Gui, Duplicate:Destroy
 Loop
 {
-    NewName := ItemName . " (" . A_Index . ")"
-    if (ItemExt != "")
+    if (ItemExt != "") {
+        NewName := ItemNameNoExt . " (" . A_Index . ")"
         NewTarget := TargetPath . "\" . NewName . "." . ItemExt
-    else
+    } else {
+        NewName := ItemName . " (" . A_Index . ")"
         NewTarget := TargetPath . "\" . NewName
+    }
     
     IfNotExist, %NewTarget%
         break

@@ -229,9 +229,11 @@ GetPathFromClipboard() {
 
 GetActiveExplorerPath() {
     WinGet, activeWin, ID, A
-    for window in ComObjCreate("Shell.Application").Windows {
-        if (window.HWND = activeWin) {
-            return window.Document.Folder.Self.Path
+    try {
+        for window in ComObjCreate("Shell.Application").Windows {
+            if (window.HWND = activeWin) {
+                return window.Document.Folder.Self.Path
+            }
         }
     }
     return ""

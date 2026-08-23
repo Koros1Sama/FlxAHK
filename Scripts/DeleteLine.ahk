@@ -1,2 +1,2 @@
-﻿Send, {End}^+{home}{Del}
+﻿Send, {End}+{Home}{Del}{Del}
 ExitApp

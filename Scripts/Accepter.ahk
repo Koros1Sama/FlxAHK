@@ -6,34 +6,23 @@ CoordMode, Mouse, Screen
 SetTitleMatchMode, 2
 
 ; --- الكشف عن النسخة السابقة (شغله مرتين يطفي) ---
-IfWinExist, MyUniqueStatus_ON_Indicator
+IfWinExist, MyUniqueStatus_ON_Accepter
 {
-    WinClose, MyUniqueStatus_ON_Indicator
+    WinClose, MyUniqueStatus_ON_Accepter
     ExitApp
 }
 
 ; --- Settings ---
-DelayTime := 5000  ; 5 seconds
-Variation := 100   ; The confirmed working variation
-
-; Image paths
-RetryImage := A_ScriptDir . "\Retry.png"
-AllowImage := A_ScriptDir . "\Allow.png"
-RunImage := A_ScriptDir . "\Run.png"
-AcceptAltImage := A_ScriptDir . "\AcceptAlt.png"
-
-; Search area (bottom-right corner)
-SearchX1 := 1500
-SearchY1 := 700
-SearchX2 := A_ScreenWidth
-SearchY2 := A_ScreenHeight
+DelayTime := 2000  ; 2 seconds
+ClickX := 1475
+ClickY := 921
 
 ; --- ON Indicator (مطابق لأسلوبك بالضبط) ---
 Gui, +AlwaysOnTop -Caption +ToolWindow +Owner
 Gui, Color, 00FF00
 Gui, Font, s12 Bold, Segoe UI
 Gui, Add, Text, cBlack Center, ON
-Gui, Show, x0 y0 NoActivate, MyUniqueStatus_ON_Indicator
+Gui, Show, x0 y0 NoActivate, MyUniqueStatus_ON_Accepter
 
 ; --- Start loop ---
 SetTimer, AccepterLoop, %DelayTime%
@@ -44,60 +33,12 @@ AccepterLoop:
     IfWinNotExist, ahk_exe Antigravity.exe
         return
 
-    ; 1. Check for Allow button
-    if (FileExist(AllowImage))
+    ; Check internet
+    Connected := DllCall("Wininet.dll\InternetCheckConnection", "Str", "http://www.google.com", "UInt", 1, "UInt", 0)
+    if (Connected)
     {
-        ImageSearch, Ax, Ay, %SearchX1%, %SearchY1%, %SearchX2%, %SearchY2%, *%Variation% %AllowImage%
-        if (!ErrorLevel)
-        {
-            ClickX := Ax + 10
-            ClickY := Ay + 10
-            Gosub, ActivateAndClick
-        }
-    }
-
-    ; 1.5. Check for Accept Alt button
-    if (FileExist(AcceptAltImage))
-    {
-        ; Search the entire screen just in case
-        ImageSearch, AxAlt, AyAlt, 0, 0, A_ScreenWidth, A_ScreenHeight, *%Variation% %AcceptAltImage%
-        if (!ErrorLevel)
-        {
-            ClickX := AxAlt + 10
-            ClickY := AyAlt + 10
-            Gosub, ActivateAndClick
-        }
-    }
-
-    ; 2. Check for Run button
-    if (FileExist(RunImage))
-    {
-        ; Search the entire screen for the Run button just in case it's located at the top right
-        ImageSearch, Rx, Ry, 0, 0, A_ScreenWidth, A_ScreenHeight, *%Variation% %RunImage%
-        if (!ErrorLevel)
-        {
-            ClickX := Rx + 10
-            ClickY := Ry + 10
-            Gosub, ActivateAndClick
-        }
-    }
-
-    ; 3. Check for Retry button
-    if (FileExist(RetryImage))
-    {
-        ImageSearch, Rtx, Rty, %SearchX1%, %SearchY1%, %SearchX2%, %SearchY2%, *%Variation% %RetryImage%
-        if (!ErrorLevel)
-        {
-            ; Found Retry -> check internet
-            Connected := DllCall("Wininet.dll\InternetCheckConnection", "Str", "http://www.google.com", "UInt", 1, "UInt", 0)
-            if (Connected)
-            {
-                ; Internet OK -> click Retry
-                ClickX := Rtx + 10
-                ClickY := Rty + 10
-                Gosub, ActivateAndClick
-            }
-        }
+        ; Internet OK -> click point
+        Gosub, ActivateAndClick
     }
 return
 

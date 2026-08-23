@@ -1,21 +1,23 @@
 ﻿#SingleInstance Force
 #Persistent
 
+ToolTip, [كليك يمين: سكون (Sleep)] | [سهم يسار: إسبات (Hibernate)]
 SetTimer, CheckTime, 2000
 return
 
 CheckTime:
+ToolTip
 ExitApp
 return
 
 RButton::
+ToolTip
 DllCall("PowrProf\SetSuspendState", "int", 0, "int", 0, "int", 0)
 Sleep, 1000
 ExitApp
-return
 
 Left::
+ToolTip
 DllCall("PowrProf\SetSuspendState", "int", 1, "int", 0, "int", 0)
 Sleep, 1000
 ExitApp
-return
