@@ -315,6 +315,15 @@ return
 
 OpenCustomHotkeysGUI() {
     global iniFile, CustomHotkeys, AdvancedScripts, baseHotkey, NoFlxHotkeys, scriptsDir
+    pyGui := scriptsDir "\FlxGUI.py"
+    if FileExist(pyGui) {
+        Run, pythonw "%pyGui%", , UseErrorLevel
+        if (!ErrorLevel)
+            return
+        Run, python "%pyGui%", , UseErrorLevel
+        if (!ErrorLevel)
+            return
+    }
     Gui, CustomHotkeys:Destroy
     Gui, CustomHotkeys:Color, 2D2D2D
     Gui, CustomHotkeys:Font, cFFFFFF s10, Segoe UI
@@ -2048,7 +2057,16 @@ CloseMonitoredFolders() {
 }
 
 OpenSettings() {
-    global monitoredFolders, monitoredFoldersWithSub, processNames, checkInterval
+    global scriptsDir, monitoredFolders, monitoredFoldersWithSub, processNames, checkInterval
+    pyGui := scriptsDir "\FlxGUI.py"
+    if FileExist(pyGui) {
+        Run, pythonw "%pyGui%", , UseErrorLevel
+        if (!ErrorLevel)
+            return
+        Run, python "%pyGui%", , UseErrorLevel
+        if (!ErrorLevel)
+            return
+    }
     Gui, GuiSettings:Destroy
     Gui, GuiSettings:Color, 2D2D2D
     Gui, GuiSettings:Font, cFFFFFF s10, Segoe UI

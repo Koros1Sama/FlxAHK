@@ -1,3 +1,5 @@
 .qodo
 
 Scripts/VlcHistory.ini
+__pycache__/
+*.pyc
