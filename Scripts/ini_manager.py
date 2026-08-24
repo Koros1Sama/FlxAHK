@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ini_manager.py — قراءة وكتابة Flx_Settings.ini بنفس تنسيق AutoHotkey تمامًا.
 
@@ -8,6 +7,7 @@ ini_manager.py — قراءة وكتابة Flx_Settings.ini بنفس تنسيق 
 - الفصل على أول "=" فقط (لأن القيم قد تحتوي فواصل مثل: Send, ^+{Left}{Del}).
 """
 
+import contextlib
 import os
 import re
 import shutil
@@ -29,24 +29,18 @@ def backup_file(path):
         backup_dir = os.path.join(os.path.dirname(path), "Backups")
         os.makedirs(backup_dir, exist_ok=True)
         stamp = time.strftime("%Y%m%d_%H%M%S")
-        target = os.path.join(
-            backup_dir,
-            "%s_%s%s" % (os.path.splitext(os.path.basename(path))[0], stamp,
-                         os.path.splitext(path)[1]),
-        )
+        stem = os.path.splitext(os.path.basename(path))[0]
+        ext = os.path.splitext(path)[1]
+        target = os.path.join(backup_dir, f"{stem}_{stamp}{ext}")
         shutil.copy2(path, target)
         # حذف الأقدم إذا تجاوزنا الحد
         pattern = re.compile(
-            r"^%s_\d{8}_\d{6}%s$"
-            % (re.escape(os.path.splitext(os.path.basename(path))[0]),
-               re.escape(os.path.splitext(path)[1]))
+            rf"^{re.escape(stem)}_\d{{8}}_\d{{6}}{re.escape(ext)}$"
         )
         backups = sorted(f for f in os.listdir(backup_dir) if pattern.match(f))
         for old in backups[:-MAX_BACKUPS]:
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(os.path.join(backup_dir, old))
-            except OSError:
-                pass
         return target
     except OSError:
         return None
@@ -63,8 +57,17 @@ class IniDocument:
     @classmethod
     def load(cls, path):
         doc = cls()
-        with open(path, "r", encoding=INI_ENCODING) as f:
-            raw = f.read()
+        # أول تشغيل على جهاز جديد: الملف غير موجود بعد — نبدأ بمستند فارغ
+        # (نفس سلوك IniRead في AHK الذي يرجع القيمة الافتراضية)، ويُنشأ عند أول حفظ
+        if not os.path.exists(path):
+            return doc
+        try:
+            with open(path, encoding=INI_ENCODING) as f:
+                raw = f.read()
+        except (OSError, UnicodeError):
+            # ملف مقفل أو تالف — نبدأ بمستند فارغ (الأصل يبقى على القرص
+            # ولا يُستبدل إلا بعد نسخة احتياطية عند أول حفظ)
+            return doc
         current = ""
         for line in raw.splitlines():
             line = line.strip()
@@ -87,17 +90,22 @@ class IniDocument:
     def save(self, path):
         lines = []
         for section, keys in self._sections.items():
-            lines.append("[%s]" % section)
+            lines.append(f"[{section}]")
             for key, value in keys.items():
                 if value:
-                    lines.append("%s=%s" % (key, value))
+                    lines.append(f"{key}={value}")
                 else:
-                    lines.append("%s=" % key)
+                    lines.append(f"{key}=")
             lines.append("")
         tmp = path + ".tmp"
-        with open(tmp, "w", encoding=INI_ENCODING) as f:
-            f.write("\n".join(lines))
-        os.replace(tmp, path)
+        try:
+            with open(tmp, "w", encoding=INI_ENCODING) as f:
+                f.write("\n".join(lines))
+            os.replace(tmp, path)
+        except OSError:
+            with contextlib.suppress(OSError):
+                os.remove(tmp)
+            raise
 
     # ---------- وصول عام ----------
 
@@ -165,7 +173,7 @@ def join_fullkey(key, condition):
     key = normalize_stored_key(key)
     condition = condition.strip()
     if condition:
-        return "%s|%s" % (key, condition)
+        return f"{key}|{condition}"
     return key
 
 
@@ -284,7 +292,7 @@ class FlxConfig:
 
     def remove_hotkey_everywhere(self, fullkey):
         removed = False
-        for kind, (section, _label) in HOTKEY_TYPES.items():
+        for _kind, (section, _label) in HOTKEY_TYPES.items():
             if self.doc.delete_value(section, fullkey):
                 removed = True
         return removed
