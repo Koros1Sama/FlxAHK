@@ -27,6 +27,10 @@ global baseHotkey
 
 InitSecureModeIndicator()
 
+; تسجيل مستقبِل WM_APP من الواجهة (FlxGUI.py) — يجب أن يكون هنا في قسم التنفيذ التلقائي
+; (كان موضوعًا سابقًا بعد return فلم يكن يُنفَّذ أبدًا)
+OnMessage(0x8000, "HandleFlxGUIReload")
+
 ; التحقق من صلاحية baseHotkey
 if (!baseHotkey || baseHotkey = "ERROR") {
     InputBox, baseHotkey, إدخال زر Flx, أدخل رمز المفتاح الأساسي (مثل SC056 أو SC029):,, 300, 150,,,, SC056
@@ -195,9 +199,8 @@ ExecuteNoFlxHotkeyConditional:
 return
 
 ;------------------ ربط الواجهة الجديدة (PySide6) ------------------
-; FlxGUI.py يرسل WM_APP عند حفظ الإعدادات، فنعيد تشغيل المحرك لقراءتها فورًا
-OnMessage(0x8000, "HandleFlxGUIReload")
-
+; (التسجيل الفعلي لـ OnMessage تم نقله إلى قسم التنفيذ التلقائي أعلى الملف
+; لأنه هنا بعد return كان كودًا ميتًا لا يُنفَّذ)
 HandleFlxGUIReload(wParam, lParam, msg, hwnd) {
     if (wParam = 0x464C58) {
         SetTimer, DoFlxGUIReload, -50
@@ -549,8 +552,11 @@ DetectKey:
         }
     }
     if (detectedKey = "") {
+        keyDetectTimedOut := 0
         SetTimer, CheckKeyTimeout, 10000
         Loop {
+            if (keyDetectTimedOut)
+                break
             Loop, 255 {
                 scanCode := Format("SC{:03X}", A_Index)
                 if GetKeyState(scanCode, "P") {
@@ -577,7 +583,7 @@ DetectKey:
 return
 
 CheckKeyTimeout:
-    detectedKey := ""
+    keyDetectTimedOut := 1
 return
 
 GenerateHotkeyList() {
@@ -1924,8 +1930,7 @@ ExecuteSingleAction(action) {
     action := Trim(action)
     if (InStr(action, "Run ") = 1) {
         command := Trim(SubStr(action, 5))
-        SplitPath, command, fileName, dir
-        if (fileName = "") {  ; إذا كان مجلدًا
+        if (InStr(FileExist(command), "D")) {  ; مجلد فعلي (فحص SplitPath السابق لم يكن يكتشفه)
             Run, explorer.exe "%command%", , UseErrorLevel
             if (A_LastError) {
                 MsgBox, 48, خطأ, فشل فتح المجلد: %command%`nخطأ: %A_LastError%
@@ -1981,7 +1986,7 @@ ExecuteSingleAction(action) {
         WinClose, A
     } else {
         try {
-            Run, %A_AhkPath% /c "%action%", , UseErrorLevel
+            Run, %action%, , UseErrorLevel
             if (A_LastError) {
                 MsgBox, 48, خطأ, فشل تنفيذ الأمر: %action%`nخطأ: %A_LastError%
             }
@@ -2092,7 +2097,7 @@ OpenSettings() {
     Gui, GuiSettings:Add, Button, x530 y85 w80 h25 gBrowseFoldersWithSub, تصفح
     Gui, GuiSettings:Add, Text, x10 y155 w200 h25, العمليات المراقبة (افصل بفواصل):
     Gui, GuiSettings:Add, Edit, x220 y155 w300 h25 vProcNames c000000 Background424242, %processNames%
-    Gui, GuiSettings:Add, Button, x530 y155 w80 h25'gBrowseProcesses, تصفح
+    Gui, GuiSettings:Add, Button, x530 y155 w80 h25 gBrowseProcesses, تصفح
     Gui, GuiSettings:Add, Text, x10 y120 w200 h25, المجلدات المستثناة (مع تفرعات):
     Gui, GuiSettings:Add, Edit, x220 y120 w300 h25 vExclFolders c000000 Background424242, %excludedFolders%
     Gui, GuiSettings:Add, Button, x530 y120 w80 h25 gBrowseExcludedFolders, تصفح
