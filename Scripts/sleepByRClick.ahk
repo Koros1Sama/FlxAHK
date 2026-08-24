@@ -2,7 +2,7 @@
 #Persistent
 
 ToolTip, [كليك يمين: سكون (Sleep)] | [سهم يسار: إسبات (Hibernate)]
-SetTimer, CheckTime, 2000
+SetTimer, CheckTime, 15000
 return
 
 CheckTime:

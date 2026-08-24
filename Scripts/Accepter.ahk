@@ -47,11 +47,10 @@ return
 ActivateAndClick:
     ; Find which window is at the button's position
     ; This correctly handles multiple windows from the same exe (Manager vs widget_test)
-    MouseGetPos_hwnd := DllCall("WindowFromPoint", "Int", ClickX, "Int", ClickY, "Ptr")
+    MouseGetPos_hwnd := DllCall("WindowFromPoint", "Int64", ClickX | (ClickY << 32), "Ptr")
     if (MouseGetPos_hwnd)
     {
         ; Get the top-level parent window
-        DllCall("GetAncestor", "Ptr", MouseGetPos_hwnd, "UInt", 2, "Ptr")
         TopHwnd := DllCall("GetAncestor", "Ptr", MouseGetPos_hwnd, "UInt", 2, "Ptr")
         if (TopHwnd)
         {
