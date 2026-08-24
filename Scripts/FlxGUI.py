@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 FlxGUI.py — واجهة FlxAHK الحديثة (PySide6).
 
@@ -12,25 +11,61 @@ import os
 import sys
 import glob
 import ctypes
+import subprocess
 from ctypes import wintypes
 
 from PySide6.QtCore import (
-    Qt, QTimer, QPropertyAnimation, QEasingCurve, QSettings, QEvent, QObject,
+    Qt,
+    QTimer,
+    QThread,
+    QPropertyAnimation,
+    QEasingCurve,
+    QSettings,
+    QEvent,
+    QObject,
 )
 from PySide6.QtGui import QFont, QKeySequence, QCursor, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QLabel, QPushButton, QLineEdit,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QStackedWidget, QListWidget,
-    QComboBox, QCheckBox, QFileDialog, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QInputDialog, QPlainTextEdit,
-    QAbstractItemView, QButtonGroup, QFrame, QGroupBox, QRadioButton,
-    QSpinBox, QGraphicsOpacityEffect, QDialog, QMenu,
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QVBoxLayout,
+    QHBoxLayout,
+    QGridLayout,
+    QStackedWidget,
+    QListWidget,
+    QComboBox,
+    QCheckBox,
+    QFileDialog,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QMessageBox,
+    QInputDialog,
+    QPlainTextEdit,
+    QAbstractItemView,
+    QButtonGroup,
+    QFrame,
+    QGroupBox,
+    QRadioButton,
+    QSpinBox,
+    QGraphicsOpacityEffect,
+    QDialog,
+    QMenu,
 )
 
 import ini_manager
 from ini_manager import (
-    IniDocument, FlxConfig, HotkeyEntry,
-    join_fullkey, split_fullkey, strip_modifiers, display_key,
+    IniDocument,
+    FlxConfig,
+    HotkeyEntry,
+    join_fullkey,
+    split_fullkey,
+    strip_modifiers,
+    display_key,
 )
 
 # ------------------------------------------------------------------ paths
@@ -61,7 +96,8 @@ def find_flx_ahk_window():
             return True
         title = ctypes.create_unicode_buffer(512)
         _user32.GetWindowTextW(hwnd, title, 512)
-        if "flx.ahk" in title.value.lower():
+        t = title.value.lower()
+        if "flx.ahk" in t or "flx.exe" in t:
             result.append(hwnd)
             return False
         return True
@@ -129,20 +165,62 @@ def get_window_exe(hwnd):
 # ------------------------------------------------------------------ خرائط المفاتيح
 
 VK_NAMES = {
-    0x08: "Backspace", 0x09: "Tab", 0x0D: "Enter", 0x13: "Pause",
-    0x14: "CapsLock", 0x20: "Space", 0x21: "PgUp", 0x22: "PgDn",
-    0x23: "End", 0x24: "Home", 0x25: "Left", 0x26: "Up",
-    0x27: "Right", 0x28: "Down", 0x2D: "Insert", 0x2E: "Delete",
-    0x5D: "AppsKey", 0x6A: "NumpadMult", 0x6B: "NumpadAdd",
-    0x6D: "NumpadSub", 0x6E: "NumpadDot", 0x6F: "NumpadDiv",
-    0x90: "NumLock", 0x91: "ScrollLock", 0xBA: ";", 0xBB: "=",
-    0xBC: ",", 0xBD: "-", 0xBE: ".", 0xBF: "/", 0xC0: "`",
-    0xDB: "[", 0xDC: "\\", 0xDD: "]", 0xDE: "'", 0xE2: "\\",
+    0x08: "Backspace",
+    0x09: "Tab",
+    0x0D: "Enter",
+    0x13: "Pause",
+    0x14: "CapsLock",
+    0x20: "Space",
+    0x21: "PgUp",
+    0x22: "PgDn",
+    0x23: "End",
+    0x24: "Home",
+    0x25: "Left",
+    0x26: "Up",
+    0x27: "Right",
+    0x28: "Down",
+    0x2D: "Insert",
+    0x2E: "Delete",
+    0x5D: "AppsKey",
+    0x6A: "NumpadMult",
+    0x6B: "NumpadAdd",
+    0x6D: "NumpadSub",
+    0x6E: "NumpadDot",
+    0x6F: "NumpadDiv",
+    0x90: "NumLock",
+    0x91: "ScrollLock",
+    0xBA: ";",
+    0xBB: "=",
+    0xBC: ",",
+    0xBD: "-",
+    0xBE: ".",
+    0xBF: "/",
+    0xC0: "`",
+    0xDB: "[",
+    0xDC: "\\",
+    0xDD: "]",
+    0xDE: "'",
+    0xE2: "\\",
 }
 
-EXCLUDED_VKS = set(range(0x01, 0x07)) | set(range(0x0A, 0x10)) | {
-    0x10, 0x11, 0x12, 0x1B, 0x5B, 0x5C, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5,
-}
+EXCLUDED_VKS = (
+    set(range(0x01, 0x07))
+    | set(range(0x0A, 0x10))
+    | {
+        0x10,
+        0x11,
+        0x12,
+        0x1B,
+        0x5B,
+        0x5C,
+        0xA0,
+        0xA1,
+        0xA2,
+        0xA3,
+        0xA4,
+        0xA5,
+    }
+)
 
 
 def vk_to_name(vk):
@@ -161,6 +239,7 @@ def vk_to_name(vk):
 
 # ------------------------------------------------------------------ أدوات واجهة
 
+
 def load_stylesheet(app):
     if os.path.exists(THEME_PATH):
         with open(THEME_PATH, "r", encoding="utf-8") as f:
@@ -170,7 +249,7 @@ def load_stylesheet(app):
 def vline():
     line = QFrame()
     line.setObjectName("StripDivider")
-    line.setFrameShape(QFrame.VLine)
+    line.setFrameShape(QFrame.Shape.VLine)
     line.setFixedHeight(36)
     return line
 
@@ -205,14 +284,17 @@ class StatCard(QWidget):
 
 # ------------------------------------------------------------------ حوار اكتشاف المفتاح
 
+
 class KeyDetectDialog(QMessageBox):
     """ينتظر ضغط مفتاح فعلي ويكشف رمزه (مثل DetectKey في AHK)."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("اكتشاف المفتاح")
-        self.setText("اضغط المفتاح الذي تريد رصده الآن…\n(سيتم الإلغاء تلقائيًا بعد 10 ثوانٍ)")
-        self.setIcon(QMessageBox.Information)
+        self.setText(
+            "اضغط المفتاح الذي تريد رصده الآن…\n(سيتم الإلغاء تلقائيًا بعد 10 ثوانٍ)"
+        )
+        self.setIcon(QMessageBox.Icon.Information)
         self.setStandardButtons(QMessageBox.Cancel)
         self.detected = None
         self._elapsed = 0
@@ -244,6 +326,7 @@ class KeyDetectDialog(QMessageBox):
 
 # ------------------------------------------------------------------ حوار التقاط نافذة
 
+
 class WindowPickMixin:
     """منطق "انقر على نافذة لالتقاط ahk_exe الخاص بها"."""
 
@@ -251,9 +334,12 @@ class WindowPickMixin:
         main = self.window()
         main.hide()
         QApplication.processEvents()
-        info = QMessageBox(QMessageBox.Information, "التقاط نافذة",
-                           "انقر على النافذة المستهدفة خلال 12 ثانية.\n"
-                           "النقر على نوافذ هذه الأداة لا يُحتسب.")
+        info = QMessageBox(
+            QMessageBox.Icon.Information,
+            "التقاط نافذة",
+            "انقر على النافذة المستهدفة خلال 12 ثانية.\n"
+            "النقر على نوافذ هذه الأداة لا يُحتسب.",
+        )
         info.show()
         QApplication.processEvents()
         QTimer.singleShot(400, info.hide)
@@ -265,7 +351,7 @@ class WindowPickMixin:
             waited = 0
             while waited < 1500 and is_key_pressed(0x01):
                 QApplication.processEvents()
-                QTimer.msleep(25)
+                QThread.msleep(25)
                 waited += 25
             while waited < timeout_ms:
                 QApplication.processEvents()
@@ -279,11 +365,11 @@ class WindowPickMixin:
                     release = 0
                     while release < 1500 and is_key_pressed(0x01):
                         QApplication.processEvents()
-                        QTimer.msleep(25)
+                        QThread.msleep(25)
                         release += 25
                         waited += 25
                     continue
-                QTimer.msleep(30)
+                QThread.msleep(30)
                 waited += 30
             return False, None
 
@@ -300,7 +386,9 @@ class WindowPickMixin:
         if condition:
             line_edit.setText(condition)
         elif clicked:
-            QMessageBox.warning(main, "خطأ", "لم يتم العثور على عملية مرتبطة بالنافذة المختارة.")
+            QMessageBox.warning(
+                main, "خطأ", "لم يتم العثور على عملية مرتبطة بالنافذة المختارة."
+            )
         else:
             QMessageBox.warning(main, "خطأ", "لم يتم النقر على أي نافذة خلال المهلة.")
 
@@ -334,6 +422,7 @@ def build_action(atype, payload):
 
 
 # ------------------------------------------------------------------ حوار تعديل اختصار
+
 
 class HotkeyEditDialog(QDialog, WindowPickMixin):
     """تعديل اختصار موجود — حوار مشروط (Modal) يمنع تضارب الحفظ."""
@@ -372,7 +461,13 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
         self.chk_shift = QCheckBox("Shift")
         self.chk_alt = QCheckBox("Alt")
         self.chk_win = QCheckBox("Win")
-        for c in (self.chk_flx, self.chk_ctrl, self.chk_shift, self.chk_alt, self.chk_win):
+        for c in (
+            self.chk_flx,
+            self.chk_ctrl,
+            self.chk_shift,
+            self.chk_alt,
+            self.chk_win,
+        ):
             mods.addWidget(c)
         mods.addStretch()
         grid.addLayout(mods, 1, 1, 1, 2)
@@ -417,7 +512,9 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
         self.code_edit.setMinimumHeight(140)
         al.addWidget(self.code_edit)
         self.script_name_edit = QLineEdit()
-        self.script_name_edit.setPlaceholderText("اسم ملف السكربت عند الحفظ (بدون .ahk)")
+        self.script_name_edit.setPlaceholderText(
+            "اسم ملف السكربت عند الحفظ (بدون .ahk)"
+        )
         al.addWidget(self.script_name_edit)
         self.rb_existing.toggled.connect(self._sync_adv_mode)
         self._sync_adv_mode()
@@ -479,16 +576,23 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
             elif too_big:
                 self.code_edit.setPlaceholderText(
                     "الملف كبير على العرض هنا (%d KB).\n"
-                    "استخدم \"سكربت موجود\" للاحتفاظ به كما هو، أو زر \"فتح موقع السكربت\" "
-                    "لتحريره بمحرر خارجي." % (os.path.getsize(path) // 1024))
-            self.script_name_edit.setText(os.path.splitext(os.path.basename(e.action))[0])
-            idx = self.script_combo.findText(os.path.splitext(os.path.basename(e.action))[0])
+                    'استخدم "سكربت موجود" للاحتفاظ به كما هو، أو زر "فتح موقع السكربت" '
+                    "لتحريره بمحرر خارجي." % (os.path.getsize(path) // 1024)
+                )
+            self.script_name_edit.setText(
+                os.path.splitext(os.path.basename(e.action))[0]
+            )
+            idx = self.script_combo.findText(
+                os.path.splitext(os.path.basename(e.action))[0]
+            )
             if idx >= 0:
                 self.script_combo.setCurrentIndex(idx)
             self.rb_code.setEnabled(not too_big)
             if too_big:
                 self.rb_existing.setChecked(True)
-                self.rb_code.setToolTip("معطّل لأن ملف السكربت كبير جدًا على التحرير المضمّن")
+                self.rb_code.setToolTip(
+                    "معطّل لأن ملف السكربت كبير جدًا على التحرير المضمّن"
+                )
             self.locate_btn.setVisible(True)
         else:
             self.action_stack.setCurrentIndex(0)
@@ -499,15 +603,18 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
         key = self.key_edit.text().strip()
         if not key:
             raise ValueError("يرجى إدخال مفتاح.")
-        prefix = ("^" if self.chk_ctrl.isChecked() else "") \
-               + ("+" if self.chk_shift.isChecked() else "") \
-               + ("!" if self.chk_alt.isChecked() else "") \
-               + ("#" if self.chk_win.isChecked() else "")
+        prefix = (
+            ("^" if self.chk_ctrl.isChecked() else "")
+            + ("+" if self.chk_shift.isChecked() else "")
+            + ("!" if self.chk_alt.isChecked() else "")
+            + ("#" if self.chk_win.isChecked() else "")
+        )
         return join_fullkey(prefix + key, self.cond_edit.text().strip())
 
     def _ask_script_name(self, default):
-        name, ok = QInputDialog.getText(self, "اسم السكربت",
-                                        "أدخل اسمًا للسكربت (بدون .ahk):", text=default)
+        name, ok = QInputDialog.getText(
+            self, "اسم السكربت", "أدخل اسمًا للسكربت (بدون .ahk):", text=default
+        )
         if not ok or not name.strip():
             return None
         name = name.strip()
@@ -539,16 +646,25 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
         use_flx = self.chk_flx.isChecked()
         old = self.entry
         exclude_fk = None if self._is_new_entry(old) else old.fullkey
-        conflict = self.cfg.find_conflict(new_fullkey, exclude_kind=None, exclude_fullkey=exclude_fk)
+        conflict = self.cfg.find_conflict(
+            new_fullkey, exclude_kind=None, exclude_fullkey=exclude_fk
+        )
         if conflict:
             ans = QMessageBox.question(
-                self, "تحذير",
-                "المفتاح مستخدم بالفعل:\n%s\nهل تريد استبداله؟" % describe_conflict(conflict),
-                QMessageBox.Yes | QMessageBox.No)
+                self,
+                "تحذير",
+                "المفتاح مستخدم بالفعل:\n%s\nهل تريد استبداله؟"
+                % describe_conflict(conflict),
+                QMessageBox.Yes | QMessageBox.No,
+            )
             if ans != QMessageBox.Yes:
                 return
 
-        kind = "advanced" if use_flx and old.kind == "advanced" else ("noflx" if not use_flx else "simple")
+        kind = (
+            "advanced"
+            if use_flx and old.kind == "advanced"
+            else ("noflx" if not use_flx else "simple")
+        )
 
         try:
             if old.kind == "advanced":
@@ -567,8 +683,11 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
                         return
                     clash = self._check_script_name_conflict(rel, new_fullkey)
                     if clash:
-                        QMessageBox.warning(self, "خطأ",
-                                            "السكربت مستخدم بالفعل لاختصار آخر:\n%s" % clash.fullkey)
+                        QMessageBox.warning(
+                            self,
+                            "خطأ",
+                            "السكربت مستخدم بالفعل لاختصار آخر:\n%s" % clash.fullkey,
+                        )
                         return
                     kind = "advanced" if use_flx else "noflx"
                     new_action = rel
@@ -577,14 +696,24 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
                     if not code.strip():
                         QMessageBox.warning(self, "خطأ", "يرجى إدخال كود السكربت.")
                         return
-                    default_name = strip_modifiers(split_fullkey(new_fullkey)[0]) or "script"
-                    name = self._ask_script_name(self.script_name_edit.text() or default_name)
+                    default_name = (
+                        strip_modifiers(split_fullkey(new_fullkey)[0]) or "script"
+                    )
+                    name = self._ask_script_name(
+                        self.script_name_edit.text() or default_name
+                    )
                     if not name:
                         return
-                    clash = self._check_script_name_conflict("Scripts\\" + name, new_fullkey)
+                    clash = self._check_script_name_conflict(
+                        "Scripts\\" + name, new_fullkey
+                    )
                     if clash:
-                        QMessageBox.warning(self, "خطأ",
-                                            "اسم السكربت مستخدم بالفعل لاختصار آخر:\n%s" % clash.fullkey)
+                        QMessageBox.warning(
+                            self,
+                            "خطأ",
+                            "اسم السكربت مستخدم بالفعل لاختصار آخر:\n%s"
+                            % clash.fullkey,
+                        )
                         return
                     self._write_script_file(name, code)
                     new_action = ("Scripts\\" + name) if use_flx else name
@@ -616,10 +745,12 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
             self.reject()
             return
         ans = QMessageBox.question(
-            self, "تأكيد",
-            "هل تريد حذف الاختصار \"%s\" مع شرط النافذة \"%s\"؟"
+            self,
+            "تأكيد",
+            'هل تريد حذف الاختصار "%s" مع شرط النافذة "%s"؟'
             % (display_key(self.entry.key), self.entry.condition or "غير محدد"),
-            QMessageBox.Yes | QMessageBox.No)
+            QMessageBox.Yes | QMessageBox.No,
+        )
         if ans != QMessageBox.Yes:
             return
         self.cfg.remove_hotkey_everywhere(self.entry.fullkey)
@@ -631,20 +762,26 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
     def _open_location(self):
         path = self.entry.resolved_script_path(BASE_DIR)
         if path and os.path.exists(path):
-            os.system('explorer.exe /select,"%s"' % path)
+            subprocess.run(["explorer.exe", "/select,", path], check=False)
         else:
             QMessageBox.warning(self, "خطأ", "لا يمكن العثور على موقع السكربت.")
 
 
 def describe_conflict(entry):
-    return "%s -> %s (%s)" % (display_key(entry.key), entry.action[:80], entry.type_label)
+    return "%s -> %s (%s)" % (
+        display_key(entry.key),
+        entry.action[:80],
+        entry.type_label,
+    )
 
 
 def list_scripts():
     files = sorted(glob.glob(os.path.join(SCRIPTS_DIR, "*.ahk")))
-    return [os.path.splitext(os.path.basename(f))[0]
-            for f in files
-            if os.path.basename(f).lower() not in ("gdip.ahk", "test_image.ahk")]
+    return [
+        os.path.splitext(os.path.basename(f))[0]
+        for f in files
+        if os.path.basename(f).lower() not in ("gdip.ahk", "test_image.ahk")
+    ]
 
 
 # ------------------------------------------------------------------ جدول الاختصارات المشترك
@@ -667,7 +804,8 @@ def fill_table(table: QTableWidget, entries):
         table.setItem(row, 1, QTableWidgetItem(entry.condition or "غير محدد"))
         action_display = entry.action
         if entry.kind == "advanced" and not os.path.exists(
-                entry.resolved_script_path(BASE_DIR) or ""):
+            entry.resolved_script_path(BASE_DIR) or ""
+        ):
             action_display += MISSING_MARKER
         item_action = QTableWidgetItem(action_display)
         item_action.setFont(MONO_FONT)
@@ -719,8 +857,10 @@ def selected_entry(table: QTableWidget):
 
 # ------------------------------------------------------------------ حالة الفراغ + قائمة السياق
 
-def attach_empty_state(view, empty_text="لا يوجد شيء هنا بعد",
-                       filtered_text="لا نتائج مطابقة للبحث"):
+
+def attach_empty_state(
+    view, empty_text="لا يوجد شيء هنا بعد", filtered_text="لا نتائج مطابقة للبحث"
+):
     """يعرض رسالة وسط الجدول/القائمة عند الفراغ أو عدم وجود نتائج بحث."""
     lbl = QLabel(empty_text, view.viewport())
     lbl.setObjectName("EmptyState")
@@ -769,10 +909,12 @@ def delete_entries(ctx, entries):
     if len(entries) > 6:
         names += "\n…"
     ans = QMessageBox.question(
-        ctx, "تأكيد الحذف",
+        ctx,
+        "تأكيد الحذف",
         "سيُزال %d اختصارًا نهائيًا من الإعدادات:\n%s\n(تُحفظ نسخة احتياطية قبل التعديل)"
         % (len(entries), names),
-        QMessageBox.Yes | QMessageBox.No)
+        QMessageBox.Yes | QMessageBox.No,
+    )
     if ans != QMessageBox.Yes:
         return False
     cfg = ctx.config()
@@ -781,8 +923,9 @@ def delete_entries(ctx, entries):
     cfg.save()
     sent = post_reload()
     ctx.refresh_all()
-    ctx.show_status("تم حذف %d اختصارًا" % len(entries)
-                    + ("" if sent else " (المحرك غير مشغّل)"))
+    ctx.show_status(
+        "تم حذف %d اختصارًا" % len(entries) + ("" if sent else " (المحرك غير مشغّل)")
+    )
     return True
 
 
@@ -805,12 +948,13 @@ def show_hotkey_context_menu(parent, entry, on_edit, on_delete):
     elif chosen == act_copy:
         QApplication.clipboard().setText(entry.action)
     elif act_locate is not None and chosen == act_locate:
-        os.system('explorer.exe /select,"%s"' % script_path)
+        subprocess.run(["explorer.exe", "/select,", script_path], check=False)
     elif chosen == act_del:
         on_delete()
 
 
 # ------------------------------------------------------------------ الصفحة 1: الرئيسية
+
 
 class HomePage(QWidget):
     def __init__(self, ctx):
@@ -822,7 +966,9 @@ class HomePage(QWidget):
 
         title = QLabel("الرئيسية")
         title.setObjectName("PageTitle")
-        subtitle = QLabel("كل الاختصارات وحالة النظام في مكان واحد — نقرة مزدوجة للتعديل، زر أيمن للمزيد")
+        subtitle = QLabel(
+            "كل الاختصارات وحالة النظام في مكان واحد — نقرة مزدوجة للتعديل، زر أيمن للمزيد"
+        )
         subtitle.setObjectName("Subtitle")
         lay.addWidget(title)
         lay.addWidget(subtitle)
@@ -837,8 +983,13 @@ class HomePage(QWidget):
         self.stat_files = StatCard("ملفات Scripts")
         self.stat_basekey = StatCard("زر Flx", mono=True)
         self.stat_secure = StatCard("وضع التسريع")
-        cards = (self.stat_total, self.stat_advanced,
-                 self.stat_files, self.stat_basekey, self.stat_secure)
+        cards = (
+            self.stat_total,
+            self.stat_advanced,
+            self.stat_files,
+            self.stat_basekey,
+            self.stat_secure,
+        )
         for i, card in enumerate(cards):
             row.addWidget(card, 1)
             if i < len(cards) - 1:
@@ -900,12 +1051,15 @@ class HomePage(QWidget):
     def _context_menu(self, pos):
         entry = selected_entry(self.table)
         show_hotkey_context_menu(
-            self.table, entry,
+            self.table,
+            entry,
             on_edit=self._edit_selected,
-            on_delete=self._delete_selected)
+            on_delete=self._delete_selected,
+        )
 
 
 # ------------------------------------------------------------------ الصفحة 2: اختصار جديد
+
 
 class AddPage(QWidget, WindowPickMixin):
     def __init__(self, ctx):
@@ -931,7 +1085,8 @@ class AddPage(QWidget, WindowPickMixin):
         self.key_edit = QLineEdit()
         self.key_edit.setPlaceholderText("مثال: T  أو  =  أو  Numpad1")
         self.key_edit.textChanged.connect(
-            lambda: self._mark_invalid(self.key_edit, False))
+            lambda: self._mark_invalid(self.key_edit, False)
+        )
         form.addWidget(self.key_edit, 0, 1)
         detect_btn = QPushButton("اكتشاف")
         detect_btn.setToolTip("اضغط هنا ثم اضغط أي مفتاح على الكيبورد لرصده تلقائيًا")
@@ -939,19 +1094,28 @@ class AddPage(QWidget, WindowPickMixin):
         form.addWidget(detect_btn, 0, 2)
 
         mods = QHBoxLayout()
-        self.chk_flx = QCheckBox("Flx"); self.chk_flx.setChecked(True)
+        self.chk_flx = QCheckBox("Flx")
+        self.chk_flx.setChecked(True)
         self.chk_ctrl = QCheckBox("Ctrl")
         self.chk_shift = QCheckBox("Shift")
         self.chk_alt = QCheckBox("Alt")
         self.chk_win = QCheckBox("Win")
-        for c in (self.chk_flx, self.chk_ctrl, self.chk_shift, self.chk_alt, self.chk_win):
+        for c in (
+            self.chk_flx,
+            self.chk_ctrl,
+            self.chk_shift,
+            self.chk_alt,
+            self.chk_win,
+        ):
             mods.addWidget(c)
         mods.addStretch()
         form.addLayout(mods, 1, 1, 1, 2)
 
         form.addWidget(QLabel("النافذة النشطة (اختياري):"), 2, 0)
         self.cond_edit = QLineEdit()
-        self.cond_edit.setPlaceholderText("اتركه فارغًا ليعمل في كل النوافذ — مثال: ahk_exe chrome.exe")
+        self.cond_edit.setPlaceholderText(
+            "اتركه فارغًا ليعمل في كل النوافذ — مثال: ahk_exe chrome.exe"
+        )
         form.addWidget(self.cond_edit, 2, 1)
         pick_btn = QPushButton("التقاط نافذة")
         pick_btn.setToolTip("اختر نافذة بالماوس ليعمل الاختصار داخلها فقط")
@@ -979,12 +1143,15 @@ class AddPage(QWidget, WindowPickMixin):
                 pl.addWidget(self.script_combo)
             elif code == "script_code":
                 self.script_name_edit = QLineEdit()
-                self.script_name_edit.setPlaceholderText("اسم السكربت (بدون .ahk) — يُترك فارغًا ليؤخذ من المفتاح")
+                self.script_name_edit.setPlaceholderText(
+                    "اسم السكربت (بدون .ahk) — يُترك فارغًا ليؤخذ من المفتاح"
+                )
                 pl.addWidget(self.script_name_edit)
                 self.code_edit = QPlainTextEdit()
                 self.code_edit.setPlaceholderText(
                     "ألصق كود AutoHotkey هنا…\nتنبيه: السكربت يُنفذ تسلسليًا بدون Hotkeys داخليّة،"
-                    " وينتهي بـ ExitApp (انظر القاعدة الذهبية في README).")
+                    " وينتهي بـ ExitApp (انظر القاعدة الذهبية في README)."
+                )
                 pl.addWidget(self.code_edit)
             else:
                 row = QHBoxLayout()
@@ -1025,10 +1192,13 @@ class AddPage(QWidget, WindowPickMixin):
 
     def _browse(self, code, edit):
         if code == "app":
-            path, _ = QFileDialog.getOpenFileName(self, "اختر تطبيقًا", "",
-                                                  "Executable Files (*.exe);;All Files (*.*)")
+            path, _ = QFileDialog.getOpenFileName(
+                self, "اختر تطبيقًا", "", "Executable Files (*.exe);;All Files (*.*)"
+            )
         elif code == "file":
-            path, _ = QFileDialog.getOpenFileName(self, "اختر ملفًا", "", "All Files (*.*)")
+            path, _ = QFileDialog.getOpenFileName(
+                self, "اختر ملفًا", "", "All Files (*.*)"
+            )
         elif code == "folder":
             path = QFileDialog.getExistingDirectory(self, "اختر مجلدًا")
         else:
@@ -1042,11 +1212,16 @@ class AddPage(QWidget, WindowPickMixin):
             self.key_edit.setText(name)
 
     def _drag_acceptable(self, urls):
-        return any(u.toLocalFile().lower().endswith((".exe", ".ahk")) or os.path.isdir(u.toLocalFile())
-                   for u in urls)
+        return any(
+            u.toLocalFile().lower().endswith((".exe", ".ahk"))
+            or os.path.isdir(u.toLocalFile())
+            for u in urls
+        )
 
     def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls() and self._drag_acceptable(event.mimeData().urls()):
+        if event.mimeData().hasUrls() and self._drag_acceptable(
+            event.mimeData().urls()
+        ):
             event.acceptProposedAction()
 
     def dropEvent(self, event):
@@ -1064,7 +1239,9 @@ class AddPage(QWidget, WindowPickMixin):
                 except OSError:
                     pass
                 name = os.path.splitext(os.path.basename(path))[0]
-                self.script_name_edit.setText("" if os.path.dirname(path) == SCRIPTS_DIR else name)
+                self.script_name_edit.setText(
+                    "" if os.path.dirname(path) == SCRIPTS_DIR else name
+                )
             elif os.path.isdir(path):
                 self.type_combo.setCurrentIndex(TYPE_INDEX["folder"])
                 self.path_edits["folder"].setText(path)
@@ -1083,10 +1260,12 @@ class AddPage(QWidget, WindowPickMixin):
         key = self.key_edit.text().strip()
         if not key:
             raise ValueError("يرجى إدخال مفتاح.")
-        prefix = ("^" if self.chk_ctrl.isChecked() else "") \
-               + ("+" if self.chk_shift.isChecked() else "") \
-               + ("!" if self.chk_alt.isChecked() else "") \
-               + ("#" if self.chk_win.isChecked() else "")
+        prefix = (
+            ("^" if self.chk_ctrl.isChecked() else "")
+            + ("+" if self.chk_shift.isChecked() else "")
+            + ("!" if self.chk_alt.isChecked() else "")
+            + ("#" if self.chk_win.isChecked() else "")
+        )
         return prefix + key, self.cond_edit.text().strip(), self.chk_flx.isChecked()
 
     def _resolve_script_payload(self, use_flx):
@@ -1102,8 +1281,9 @@ class AddPage(QWidget, WindowPickMixin):
 
     def _save_new_code_script(self, key_for_default, content, exclude_fullkey, cfg):
         default = key_for_default or "new_script"
-        name, ok = QInputDialog.getText(self, "اسم السكربت",
-                                        "أدخل اسمًا للسكربت (بدون .ahk):", text=default)
+        name, ok = QInputDialog.getText(
+            self, "اسم السكربت", "أدخل اسمًا للسكربت (بدون .ahk):", text=default
+        )
         if not ok or not name.strip():
             return None
         name = name.strip()
@@ -1111,10 +1291,14 @@ class AddPage(QWidget, WindowPickMixin):
             name += ".ahk"
         rel = "Scripts\\" + name
         for hk in cfg.iter_hotkeys():
-            if hk.fullkey.lower() != exclude_fullkey.lower() and \
-               hk.action.replace("/", "\\") == rel.replace("/", "\\"):
-                QMessageBox.warning(self, "خطأ",
-                                    "اسم السكربت مستخدم بالفعل لاختصار آخر:\n%s" % hk.fullkey)
+            if hk.fullkey.lower() != exclude_fullkey.lower() and hk.action.replace(
+                "/", "\\"
+            ) == rel.replace("/", "\\"):
+                QMessageBox.warning(
+                    self,
+                    "خطأ",
+                    "اسم السكربت مستخدم بالفعل لاختصار آخر:\n%s" % hk.fullkey,
+                )
                 return None
         path = os.path.join(SCRIPTS_DIR, name)
         with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
@@ -1134,10 +1318,13 @@ class AddPage(QWidget, WindowPickMixin):
 
         conflict = cfg.find_conflict(fullkey)
         if conflict:
-            ans = QMessageBox.question(self, "تحذير",
-                                       "المفتاح مستخدم بالفعل:\n%s\nهل تريد استبداله؟"
-                                       % describe_conflict(conflict),
-                                       QMessageBox.Yes | QMessageBox.No)
+            ans = QMessageBox.question(
+                self,
+                "تحذير",
+                "المفتاح مستخدم بالفعل:\n%s\nهل تريد استبداله؟"
+                % describe_conflict(conflict),
+                QMessageBox.Yes | QMessageBox.No,
+            )
             if ans != QMessageBox.Yes:
                 return
 
@@ -1151,7 +1338,9 @@ class AddPage(QWidget, WindowPickMixin):
                 content = self.code_edit.toPlainText()
                 if not content.strip():
                     raise ValueError("يرجى إدخال كود السكربت.")
-                default_name = self.script_name_edit.text().strip() or strip_modifiers(prefixed_key)
+                default_name = self.script_name_edit.text().strip() or strip_modifiers(
+                    prefixed_key
+                )
                 name = self._save_new_code_script(default_name, content, fullkey, cfg)
                 if not name:
                     return
@@ -1173,8 +1362,10 @@ class AddPage(QWidget, WindowPickMixin):
         sent = post_reload()
         self.ctx.refresh_all()
         self._clear()
-        self.ctx.show_status("تمت إضافة الاختصار"
-                             + ("" if sent else " (المحرك غير مشغّل — ستُطبَّق عند تشغيله)"))
+        self.ctx.show_status(
+            "تمت إضافة الاختصار"
+            + ("" if sent else " (المحرك غير مشغّل — ستُطبَّق عند تشغيله)")
+        )
 
     def _clear(self):
         self.key_edit.clear()
@@ -1190,6 +1381,7 @@ class AddPage(QWidget, WindowPickMixin):
 
 # ------------------------------------------------------------------ الصفحة 3: الإدارة
 
+
 class ManagePage(QWidget):
     def __init__(self, ctx):
         super().__init__()
@@ -1200,7 +1392,9 @@ class ManagePage(QWidget):
 
         title = QLabel("الإدارة")
         title.setObjectName("PageTitle")
-        subtitle = QLabel("تعديل وحذف الاختصارات، وتنظيف السكربتات اليتيمة — كل عمليات الحذف مؤكدة ومحمية بنسخة احتياطية")
+        subtitle = QLabel(
+            "تعديل وحذف الاختصارات، وتنظيف السكربتات اليتيمة — كل عمليات الحذف مؤكدة ومحمية بنسخة احتياطية"
+        )
         subtitle.setObjectName("Subtitle")
         lay.addWidget(title)
         lay.addWidget(subtitle)
@@ -1231,7 +1425,9 @@ class ManagePage(QWidget):
         edit_btn.clicked.connect(self._edit_selected)
         delete_btn = QPushButton("حذف المحدد")
         delete_btn.setObjectName("DangerButton")
-        delete_btn.setToolTip("يمكن تحديد عدة صفوف بـ Ctrl أو Shift ثم الحذف دفعة واحدة")
+        delete_btn.setToolTip(
+            "يمكن تحديد عدة صفوف بـ Ctrl أو Shift ثم الحذف دفعة واحدة"
+        )
         delete_btn.clicked.connect(self._delete_selected)
         btns.addWidget(edit_btn)
         btns.addWidget(delete_btn)
@@ -1243,7 +1439,9 @@ class ManagePage(QWidget):
         ug_layout = QHBoxLayout(self.unused_group)
         self.unused_list = QListWidget()
         self.unused_list.setMaximumHeight(110)
-        self.unused_list.setToolTip("سكربتات في مجلد Scripts لا يشير إليها أي اختصار — مكتبة Gdip مستثناة دائمًا")
+        self.unused_list.setToolTip(
+            "سكربتات في مجلد Scripts لا يشير إليها أي اختصار — مكتبة Gdip مستثناة دائمًا"
+        )
         ug_layout.addWidget(self.unused_list, 1)
         ucol = QVBoxLayout()
         del_unused_btn = QPushButton("حذف المحدد")
@@ -1261,7 +1459,8 @@ class ManagePage(QWidget):
         self._unused_empty = attach_empty_state(
             self.unused_list,
             empty_text="لا سكربتات يتيمة — كلها مستخدمة",
-            filtered_text="")
+            filtered_text="",
+        )
 
     def _filter(self, term):
         apply_search(self.table, term)
@@ -1310,9 +1509,11 @@ class ManagePage(QWidget):
     def _context_menu(self, pos):
         entry = selected_entry(self.table)
         show_hotkey_context_menu(
-            self.table, entry,
+            self.table,
+            entry,
             on_edit=self._edit_selected,
-            on_delete=self._delete_selected)
+            on_delete=self._delete_selected,
+        )
 
     def _delete_unused(self):
         items = self.unused_list.selectedItems()
@@ -1320,8 +1521,12 @@ class ManagePage(QWidget):
             QMessageBox.information(self, "تنبيه", "حدد سكربتًا لحذفه أولًا.")
             return
         name = items[0].text()
-        ans = QMessageBox.question(self, "تأكيد", 'سيُحذف السكربت "%s" نهائيًا من القرص. متابعة؟' % name,
-                                   QMessageBox.Yes | QMessageBox.No)
+        ans = QMessageBox.question(
+            self,
+            "تأكيد",
+            'سيُحذف السكربت "%s" نهائيًا من القرص. متابعة؟' % name,
+            QMessageBox.Yes | QMessageBox.No,
+        )
         if ans != QMessageBox.Yes:
             return
         path = os.path.join(SCRIPTS_DIR, name)
@@ -1335,6 +1540,7 @@ class ManagePage(QWidget):
 
 
 # ------------------------------------------------------------------ الصفحة 4: الإعدادات
+
 
 class SettingsPage(QWidget, WindowPickMixin):
     def __init__(self, ctx):
@@ -1368,8 +1574,10 @@ class SettingsPage(QWidget, WindowPickMixin):
             self.folder_rows[field_key] = (edit, browse_kind)
             form.addWidget(edit, r, 1)
             btn = QPushButton("+ إضافة")
-            btn.setToolTip("يُضاف المسار إلى نهاية القائمة الحالية مفصولًا بفاصلة — "
-                           "وللاستبدال عدّل النص يدويًا")
+            btn.setToolTip(
+                "يُضاف المسار إلى نهاية القائمة الحالية مفصولًا بفاصلة — "
+                "وللاستبدال عدّل النص يدويًا"
+            )
             btn.clicked.connect(lambda _=False, k=field_key: self._append_browse(k))
             form.addWidget(btn, r, 2)
 
@@ -1378,15 +1586,19 @@ class SettingsPage(QWidget, WindowPickMixin):
         self.interval_spin.setRange(100, 600000)
         self.interval_spin.setSingleStep(100)
         self.interval_spin.setGroupSeparatorShown(True)
-        self.interval_spin.setToolTip("كل كم ميلي ثانية يفحص المحرك العمليات والمجلدات أثناء وضع التسريع")
+        self.interval_spin.setToolTip(
+            "كل كم ميلي ثانية يفحص المحرك العمليات والمجلدات أثناء وضع التسريع"
+        )
         form.addWidget(self.interval_spin, len(rows), 1)
 
         form.addWidget(QLabel("زر Flx الأساسي (BaseKey):"), len(rows) + 1, 0)
         base_row = QHBoxLayout()
         self.basekey_edit = QLineEdit()
         self.basekey_edit.setPlaceholderText("SC056")
-        self.basekey_edit.setToolTip("رمز المفتاح الفيزيائي مثل SC056 أو VK07 — "
-                                     "يُستخدم كبادئة لكل الاختصارات مثل Flx+T")
+        self.basekey_edit.setToolTip(
+            "رمز المفتاح الفيزيائي مثل SC056 أو VK07 — "
+            "يُستخدم كبادئة لكل الاختصارات مثل Flx+T"
+        )
         base_detect = QPushButton("اكتشاف")
         base_detect.clicked.connect(self._detect_basekey)
         base_row.addWidget(self.basekey_edit, 1)
@@ -1414,8 +1626,9 @@ class SettingsPage(QWidget, WindowPickMixin):
         if kind == "folder":
             path = QFileDialog.getExistingDirectory(self, "اختر مجلدًا")
         else:
-            path, _ = QFileDialog.getOpenFileName(self, "اختر عملية", "",
-                                                  "Executable Files (*.exe)")
+            path, _ = QFileDialog.getOpenFileName(
+                self, "اختر عملية", "", "Executable Files (*.exe)"
+            )
             if path:
                 path = os.path.basename(path)
         if not path:
@@ -1449,12 +1662,18 @@ class SettingsPage(QWidget, WindowPickMixin):
         cfg.save()
         sent = post_reload()
         self.ctx.refresh_all()
-        self.ctx.show_status("تم حفظ الإعدادات"
-                             + (" وأُعيد تحميل المحرك" if sent
-                                else " (المحرك غير مشغّل — ستُطبَّق عند تشغيله)"))
+        self.ctx.show_status(
+            "تم حفظ الإعدادات"
+            + (
+                " وأُعيد تحميل المحرك"
+                if sent
+                else " (المحرك غير مشغّل — ستُطبَّق عند تشغيله)"
+            )
+        )
 
 
 # ------------------------------------------------------------------ الصفحة 5: الأمان
+
 
 class SecurityPage(QWidget):
     def __init__(self, ctx):
@@ -1466,7 +1685,9 @@ class SecurityPage(QWidget):
 
         title = QLabel("الأمان — وضع التسريع")
         title.setObjectName("PageTitle")
-        subtitle = QLabel("إغلاق تلقائي للعمليات والمجلدات المراقبة. التبديل اللحظي يبقى متاحًا عبر Flx + D")
+        subtitle = QLabel(
+            "إغلاق تلقائي للعمليات والمجلدات المراقبة. التبديل اللحظي يبقى متاحًا عبر Flx + D"
+        )
         subtitle.setObjectName("Subtitle")
         lay.addWidget(title)
         lay.addWidget(subtitle)
@@ -1527,11 +1748,20 @@ class SecurityPage(QWidget):
         self.state_label.setText("وضع التسريع مفعّل" if active else "وضع التسريع متوقف")
         self.toggle_btn.setText("إيقاف الوضع الآن" if active else "تفعيل الوضع الآن")
         self.proc_edit.setText(settings.get("ProcessNames", ""))
-        folders = " / ".join(filter(None, [settings.get("MonitoredFolders", ""),
-                                           settings.get("MonitoredFoldersWithSub", "")]))
+        folders = " / ".join(
+            filter(
+                None,
+                [
+                    settings.get("MonitoredFolders", ""),
+                    settings.get("MonitoredFoldersWithSub", ""),
+                ],
+            )
+        )
         excluded = settings.get("ExcludedFolders", "")
-        self.folders_hint.setText(("مراقب: %s" % folders if folders else "لا توجد مجلدات مراقبة")
-                                  + (("   —   مستثنى: %s" % excluded) if excluded else ""))
+        self.folders_hint.setText(
+            ("مراقب: %s" % folders if folders else "لا توجد مجلدات مراقبة")
+            + (("   —   مستثنى: %s" % excluded) if excluded else "")
+        )
 
     def _toggle_mode(self):
         cfg = self.ctx.config()
@@ -1540,16 +1770,26 @@ class SecurityPage(QWidget):
 
         if not active:
             # تفعيل إجراء هجومي (قتل عمليات) — يستحق تأكيدًا صريحًا يوضح العواقب
-            procs = [p.strip() for p in settings.get("ProcessNames", "").split(",") if p.strip()]
+            procs = [
+                p.strip()
+                for p in settings.get("ProcessNames", "").split(",")
+                if p.strip()
+            ]
             lines = ["عند التفعيل سيعمل المحرك فورًا ودوريًا على إغلاق العمليات:"]
             lines += ["• " + p for p in (procs[:8] or ["—"])]
             if len(procs) > 8:
                 lines.append("… و%d أخرى" % (len(procs) - 8))
-            watched = settings.get("MonitoredFoldersWithSub", "") or settings.get("MonitoredFolders", "")
+            watched = settings.get("MonitoredFoldersWithSub", "") or settings.get(
+                "MonitoredFolders", ""
+            )
             if watched:
                 lines += ["", "وسيُغلق أي مجلد مستكشف داخل:", watched]
-            ans = QMessageBox.question(self, "تفعيل وضع التسريع", "\n".join(lines),
-                                       QMessageBox.Yes | QMessageBox.No)
+            ans = QMessageBox.question(
+                self,
+                "تفعيل وضع التسريع",
+                "\n".join(lines),
+                QMessageBox.Yes | QMessageBox.No,
+            )
             if ans != QMessageBox.Yes:
                 return
 
@@ -1564,8 +1804,9 @@ class SecurityPage(QWidget):
         self.ctx.show_status(msg)
 
     def _add_process(self):
-        path, _ = QFileDialog.getOpenFileName(self, "اختر عملية", "",
-                                              "Executable Files (*.exe)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "اختر عملية", "", "Executable Files (*.exe)"
+        )
         if not path:
             return
         name = os.path.basename(path)
@@ -1580,8 +1821,9 @@ class SecurityPage(QWidget):
         cfg.save()
         sent = post_reload()
         self.ctx.refresh_all()
-        self.ctx.show_status("تم حفظ قائمة العمليات"
-                             + ("" if sent else " (المحرك غير مشغّل)"))
+        self.ctx.show_status(
+            "تم حفظ قائمة العمليات" + ("" if sent else " (المحرك غير مشغّل)")
+        )
 
 
 # ------------------------------------------------------------------ النافذة الرئيسية
@@ -1655,11 +1897,18 @@ class MainWindow(QMainWindow):
         self.manage_page = ManagePage(self)
         self.settings_page = SettingsPage(self)
         self.security_page = SecurityPage(self)
-        for page in (self.home_page, self.add_page, self.manage_page,
-                     self.settings_page, self.security_page):
+        for page in (
+            self.home_page,
+            self.add_page,
+            self.manage_page,
+            self.settings_page,
+            self.security_page,
+        ):
             self.stack.addWidget(page)
 
-        self.statusBar().showMessage("جاهز — F5 تحديث · Ctrl+F بحث · Ctrl+N اختصار جديد")
+        self.statusBar().showMessage(
+            "جاهز — F5 تحديث · Ctrl+F بحث · Ctrl+N اختصار جديد"
+        )
 
         self.refresh_all()
         self._switch_animate(0)
@@ -1765,6 +2014,7 @@ class SingleInstance:
 
 
 # ------------------------------------------------------------------ التشغيل
+
 
 def main():
     app = QApplication(sys.argv)
