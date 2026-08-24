@@ -31,6 +31,11 @@ InitSecureModeIndicator()
 ; (كان موضوعًا سابقًا بعد return فلم يكن يُنفَّذ أبدًا)
 OnMessage(0x8000, "HandleFlxGUIReload")
 
+; في النسخة المُجمَّعة يشير A_AhkPath إلى Flx.exe نفسه (تحقق تجريبيًا)،
+; لذا نحل مسار مفسر AutoHotkey الحقيقي مرة واحدة عند الإقلاع
+global gAhkExe
+gAhkExe := ResolveAhkInterpreter()
+
 ; التحقق من صلاحية baseHotkey
 if (!baseHotkey || baseHotkey = "ERROR") {
     InputBox, baseHotkey, إدخال زر Flx, أدخل رمز المفتاح الأساسي (مثل SC056 أو SC029):,, 300, 150,,,, SC056
@@ -184,12 +189,7 @@ ExecuteNoFlxHotkeyConditional:
     if (RegExMatch(action, "\.ahk$")) {
         fullPath := (InStr(action, "\") = 1 || InStr(action, ":") = 2) ? action : scriptsDir "\" action
         if FileExist(fullPath) {
-            SetWorkingDir, %scriptsDir%
-            Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
-            SetWorkingDir, %A_ScriptDir%
-            if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
-            }
+            RunAhkScript(fullPath)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }
@@ -212,9 +212,20 @@ DoFlxGUIReload:
     Reload
 return
 
-; تشغيل واجهة PySide6 الجديدة
+; واجهة PySide6 — ضغطة أولى تُظهرها، وضغطة ثانية تخفيها (تبقى مقيمة في جوار النظام)
 OpenFlxGUI:
-    guiPyFile := A_ScriptDir "\Scripts\FlxGUI.py"
+    savedMatchMode := A_TitleMatchMode
+    SetTitleMatchMode, 2
+    guiHwnd := WinExist("FlxAHK ahk_exe pythonw.exe")
+    if (!guiHwnd)
+        guiHwnd := WinExist("FlxAHK ahk_exe python.exe")
+    SetTitleMatchMode, %savedMatchMode%
+    if (guiHwnd) {
+        ; مفتوحة الآن — نخفيها (الإغلاق الفعلي من قائمة جوار النظام)
+        WinClose, ahk_id %guiHwnd%
+        return
+    }
+    guiPyFile := A_ScriptDir "\Scripts\FlxShow.py"
     if FileExist(guiPyFile) {
         Run, pythonw.exe "%guiPyFile%", %A_ScriptDir%\Scripts, UseErrorLevel
         if (ErrorLevel) {
@@ -326,12 +337,7 @@ ExecuteFromMenu:
         scriptPath := AdvancedScripts[fullKey]
         fullPath := A_ScriptDir "\" scriptPath
         if FileExist(fullPath) {
-            SetWorkingDir, %scriptsDir%
-            Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
-            SetWorkingDir, %A_ScriptDir%
-            if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
-            }
+            RunAhkScript(fullPath)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }
@@ -469,6 +475,43 @@ SaveBaseHotkey:
     ReloadHotkeys(oldBaseHotkey)
     MsgBox, 64, تم, تم تغيير زر الFlx إلى %baseHotkey% وإعادة تعريف الاختصارات بنجاح!
 return
+
+; في النسخة المُجمَّعة A_AhkPath يشير إلى الملف التنفيذي نفسه فلا يصلح
+; لتشغيل ملفات ahk خارجية — نبحث عن تثبيت AutoHotkey حقيقي.
+ResolveAhkInterpreter() {
+    if (!A_IsCompiled)
+        return A_AhkPath
+    candidates := []
+    RegRead, installDir, HKLM\SOFTWARE\AutoHotkey, InstallDir
+    if (!ErrorLevel && installDir != "") {
+        installDir := RTrim(installDir, "\")
+        candidates.Push(installDir "\AutoHotkeyU64.exe")
+        candidates.Push(installDir "\AutoHotkeyU32.exe")
+        candidates.Push(installDir "\AutoHotkeyA32.exe")
+        candidates.Push(installDir "\AutoHotkey.exe")
+    }
+    candidates.Push(A_ProgramFiles "\AutoHotkey\AutoHotkeyU64.exe")
+    candidates.Push(A_ProgramFiles "\AutoHotkey\AutoHotkey.exe")
+    for index, candidate in candidates {
+        if FileExist(candidate)
+            return candidate
+    }
+    return ""  ; لا يوجد مفسر — النسخة المُجمَّعة وحدها لا تستطيع تشغيل ملفات ahk خارجية
+}
+
+RunAhkScript(fullPath) {
+    global gAhkExe, scriptsDir
+    if (gAhkExe = "") {
+        MsgBox, 48, خطأ, لا يوجد تثبيت AutoHotkey على الجهاز لتشغيل ملفات السكربت الخارجية:`n(النسخة المُجمَّعة Flx.exe لا تشغّلها بنفسها)`n`n%fullPath%
+        return
+    }
+    SetWorkingDir, %scriptsDir%
+    Run, %gAhkExe% "%fullPath%", , UseErrorLevel
+    SetWorkingDir, %A_ScriptDir%
+    if (A_LastError) {
+        MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
+    }
+}
 
 ReloadHotkeys(oldBaseHotkey) {
     global baseHotkey, CustomHotkeys, AdvancedScripts, NoFlxHotkeys
@@ -1875,12 +1918,7 @@ ExecuteHotkey:
         scriptPath := AdvancedScripts[fullKeyWithCondition]
         fullPath := A_ScriptDir "\" scriptPath
         if FileExist(fullPath) {
-            SetWorkingDir, %scriptsDir%
-            Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
-            SetWorkingDir, %A_ScriptDir%
-            if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
-            }
+            RunAhkScript(fullPath)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }
@@ -1889,12 +1927,7 @@ ExecuteHotkey:
         scriptPath := AdvancedScripts[fullKeyDefault]
         fullPath := A_ScriptDir "\" scriptPath
         if FileExist(fullPath) {
-            SetWorkingDir, %scriptsDir%
-            Run, %A_AhkPath% "%fullPath%", , UseErrorLevel
-            SetWorkingDir, %A_ScriptDir%
-            if (A_LastError) {
-                MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
-            }
+            RunAhkScript(fullPath)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }

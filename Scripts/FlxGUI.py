@@ -12,6 +12,7 @@ import sys
 import glob
 import ctypes
 import subprocess
+import contextlib
 from ctypes import wintypes
 
 from PySide6.QtCore import (
@@ -52,14 +53,14 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QRadioButton,
     QSpinBox,
+    QStyle,
+    QSystemTrayIcon,
     QGraphicsOpacityEffect,
     QDialog,
     QMenu,
 )
 
-import ini_manager
 from ini_manager import (
-    IniDocument,
     FlxConfig,
     HotkeyEntry,
     join_fullkey,
@@ -231,10 +232,10 @@ def vk_to_name(vk):
     if 0x41 <= vk <= 0x5A:
         return chr(vk)
     if 0x60 <= vk <= 0x69:
-        return "Numpad%d" % (vk - 0x60)
+        return f"Numpad{vk - 0x60}"
     if 0x70 <= vk <= 0x87:
-        return "F%d" % (vk - 0x6F)
-    return "VK%02X" % vk
+        return f"F{vk - 0x6F}"
+    return f"VK{vk:02X}"
 
 
 # ------------------------------------------------------------------ أدوات واجهة
@@ -242,8 +243,11 @@ def vk_to_name(vk):
 
 def load_stylesheet(app):
     if os.path.exists(THEME_PATH):
-        with open(THEME_PATH, "r", encoding="utf-8") as f:
-            app.setStyleSheet(f.read())
+        try:
+            with open(THEME_PATH, encoding="utf-8") as f:
+                app.setStyleSheet(f.read())
+        except OSError:
+            pass  # بدون الثيم تعمل الواجهة بالشكل الافتراضي
 
 
 def vline():
@@ -264,10 +268,10 @@ class StatCard(QWidget):
         lay.setSpacing(3)
         self.value_label = QLabel(value)
         self.value_label.setObjectName("StatValueMono" if mono else "StatValue")
-        self.value_label.setAlignment(Qt.AlignCenter)
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.text_label = QLabel(label)
         self.text_label.setObjectName("StatLabel")
-        self.text_label.setAlignment(Qt.AlignCenter)
+        self.text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self.value_label)
         lay.addWidget(self.text_label)
 
@@ -295,7 +299,7 @@ class KeyDetectDialog(QMessageBox):
             "اضغط المفتاح الذي تريد رصده الآن…\n(سيتم الإلغاء تلقائيًا بعد 10 ثوانٍ)"
         )
         self.setIcon(QMessageBox.Icon.Information)
-        self.setStandardButtons(QMessageBox.Cancel)
+        self.setStandardButtons(QMessageBox.StandardButton.Cancel)
         self.detected = None
         self._elapsed = 0
         self.timer = QTimer(self)
@@ -327,7 +331,7 @@ class KeyDetectDialog(QMessageBox):
 # ------------------------------------------------------------------ حوار التقاط نافذة
 
 
-class WindowPickMixin:
+class WindowPickMixin(QWidget):
     """منطق "انقر على نافذة لالتقاط ahk_exe الخاص بها"."""
 
     def pick_window_condition(self, line_edit):
@@ -418,13 +422,13 @@ def build_action(atype, payload):
         return "Send " + payload
     if atype == "script_existing":
         raise ValueError("script_existing يجب أن يُعالج عبر مسار خاص")
-    raise ValueError("نوع غير معروف: %s" % atype)
+    raise ValueError(f"نوع غير معروف: {atype}")
 
 
 # ------------------------------------------------------------------ حوار تعديل اختصار
 
 
-class HotkeyEditDialog(QDialog, WindowPickMixin):
+class HotkeyEditDialog(WindowPickMixin, QDialog):
     """تعديل اختصار موجود — حوار مشروط (Modal) يمنع تضارب الحفظ."""
 
     MAX_INLINE_SCRIPT_BYTES = 150 * 1024
@@ -435,7 +439,7 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
         self.entry = entry
         self.on_saved = on_saved
         self.setWindowTitle("تعديل الاختصار")
-        self.setLayoutDirection(Qt.RightToLeft)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setMinimumWidth(560)
         self._build_ui()
         self._load_entry()
@@ -565,19 +569,24 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
             self.action_stack.setCurrentIndex(1)
             path = e.resolved_script_path(BASE_DIR)
             too_big = False
+            size_kb = 0
             if path and os.path.exists(path):
                 try:
-                    too_big = os.path.getsize(path) > self.MAX_INLINE_SCRIPT_BYTES
+                    size_kb = os.path.getsize(path) // 1024
+                    too_big = size_kb * 1024 > self.MAX_INLINE_SCRIPT_BYTES
                 except OSError:
                     too_big = False
             if path and os.path.exists(path) and not too_big:
-                with open(path, "r", encoding="utf-8-sig", errors="replace") as f:
-                    self.code_edit.setPlainText(f.read())
+                try:
+                    with open(path, encoding="utf-8-sig", errors="replace") as f:
+                        self.code_edit.setPlainText(f.read())
+                except OSError:
+                    too_big = True
             elif too_big:
                 self.code_edit.setPlaceholderText(
-                    "الملف كبير على العرض هنا (%d KB).\n"
+                    f"الملف كبير على العرض هنا ({size_kb} KB).\n"
                     'استخدم "سكربت موجود" للاحتفاظ به كما هو، أو زر "فتح موقع السكربت" '
-                    "لتحريره بمحرر خارجي." % (os.path.getsize(path) // 1024)
+                    "لتحريره بمحرر خارجي."
                 )
             self.script_name_edit.setText(
                 os.path.splitext(os.path.basename(e.action))[0]
@@ -624,8 +633,12 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
 
     def _write_script_file(self, filename, content):
         path = os.path.join(SCRIPTS_DIR, filename)
-        with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
-            f.write(content.rstrip("\n") + "\n")
+        try:
+            with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
+                f.write(content.rstrip("\n") + "\n")
+        except OSError as exc:
+            QMessageBox.critical(self, "خطأ", f"فشل حفظ ملف السكربت:\n{exc}")
+            return None
         return path
 
     def _check_script_name_conflict(self, script_path_rel, exclude_fullkey):
@@ -653,11 +666,10 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
             ans = QMessageBox.question(
                 self,
                 "تحذير",
-                "المفتاح مستخدم بالفعل:\n%s\nهل تريد استبداله؟"
-                % describe_conflict(conflict),
-                QMessageBox.Yes | QMessageBox.No,
+                f"المفتاح مستخدم بالفعل:\n{describe_conflict(conflict)}\nهل تريد استبداله؟",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if ans != QMessageBox.Yes:
+            if ans != QMessageBox.StandardButton.Yes:
                 return
 
         kind = (
@@ -686,7 +698,7 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
                         QMessageBox.warning(
                             self,
                             "خطأ",
-                            "السكربت مستخدم بالفعل لاختصار آخر:\n%s" % clash.fullkey,
+                            f"السكربت مستخدم بالفعل لاختصار آخر:\n{clash.fullkey}",
                         )
                         return
                     kind = "advanced" if use_flx else "noflx"
@@ -711,8 +723,7 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
                         QMessageBox.warning(
                             self,
                             "خطأ",
-                            "اسم السكربت مستخدم بالفعل لاختصار آخر:\n%s"
-                            % clash.fullkey,
+                            f"اسم السكربت مستخدم بالفعل لاختصار آخر:\n{clash.fullkey}",
                         )
                         return
                     self._write_script_file(name, code)
@@ -729,7 +740,7 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
             self.cfg.upsert_hotkey(kind, new_fullkey, new_action)
             self.cfg.save()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "خطأ", "فشل الحفظ:\n%s" % exc)
+            QMessageBox.critical(self, "خطأ", f"فشل الحفظ:\n{exc}")
             return
 
         post_reload()
@@ -744,14 +755,15 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
         if self._is_new_entry(self.entry):
             self.reject()
             return
+        cond_text = self.entry.condition or "غير محدد"
         ans = QMessageBox.question(
             self,
             "تأكيد",
-            'هل تريد حذف الاختصار "%s" مع شرط النافذة "%s"؟'
-            % (display_key(self.entry.key), self.entry.condition or "غير محدد"),
-            QMessageBox.Yes | QMessageBox.No,
+            f'هل تريد حذف الاختصار "{display_key(self.entry.key)}" '
+            f'مع شرط النافذة "{cond_text}"؟',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if ans != QMessageBox.Yes:
+        if ans != QMessageBox.StandardButton.Yes:
             return
         self.cfg.remove_hotkey_everywhere(self.entry.fullkey)
         self.cfg.save()
@@ -768,11 +780,7 @@ class HotkeyEditDialog(QDialog, WindowPickMixin):
 
 
 def describe_conflict(entry):
-    return "%s -> %s (%s)" % (
-        display_key(entry.key),
-        entry.action[:80],
-        entry.type_label,
-    )
+    return f"{display_key(entry.key)} -> {entry.action[:80]} ({entry.type_label})"
 
 
 def list_scripts():
@@ -798,7 +806,7 @@ def fill_table(table: QTableWidget, entries):
         row = table.rowCount()
         table.insertRow(row)
         item_key = QTableWidgetItem(display_key(entry.key))
-        item_key.setData(Qt.UserRole, (entry.kind, entry.fullkey))
+        item_key.setData(Qt.ItemDataRole.UserRole, (entry.kind, entry.fullkey))
         item_key.setToolTip(entry.fullkey)
         table.setItem(row, 0, item_key)
         table.setItem(row, 1, QTableWidgetItem(entry.condition or "غير محدد"))
@@ -822,11 +830,11 @@ def make_table():
     table = QTableWidget(0, 4)
     table.setHorizontalHeaderLabels(HOTKEY_COLUMNS)
     table.verticalHeader().setVisible(False)
-    table.setSelectionBehavior(QAbstractItemView.SelectRows)
-    table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
     table.setAlternatingRowColors(True)
     header = table.horizontalHeader()
-    header.setSectionResizeMode(2, QHeaderView.Stretch)
+    header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
     return table
 
 
@@ -850,8 +858,9 @@ def selected_entry(table: QTableWidget):
     item = table.item(row, 0)
     if not item:
         return None
-    kind, fullkey = item.data(Qt.UserRole)
-    action = table.item(row, 2).text().replace(MISSING_MARKER, "")
+    kind, fullkey = item.data(Qt.ItemDataRole.UserRole)
+    item_action = table.item(row, 2)
+    action = (item_action.text() if item_action else "").replace(MISSING_MARKER, "")
     return HotkeyEntry(kind, fullkey, action)
 
 
@@ -864,8 +873,8 @@ def attach_empty_state(
     """يعرض رسالة وسط الجدول/القائمة عند الفراغ أو عدم وجود نتائج بحث."""
     lbl = QLabel(empty_text, view.viewport())
     lbl.setObjectName("EmptyState")
-    lbl.setAlignment(Qt.AlignCenter)
-    lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
+    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     lbl.hide()
 
     def reposition():
@@ -891,7 +900,7 @@ def attach_empty_state(
 
     class _ResizeFilter(QObject):
         def eventFilter(self, obj, event):
-            if event.type() == QEvent.Resize:
+            if event.type() == QEvent.Type.Resize:
                 reposition()
             return False
 
@@ -911,11 +920,11 @@ def delete_entries(ctx, entries):
     ans = QMessageBox.question(
         ctx,
         "تأكيد الحذف",
-        "سيُزال %d اختصارًا نهائيًا من الإعدادات:\n%s\n(تُحفظ نسخة احتياطية قبل التعديل)"
-        % (len(entries), names),
-        QMessageBox.Yes | QMessageBox.No,
+        f"سيُزال {len(entries)} اختصارًا نهائيًا من الإعدادات:\n{names}\n"
+        "(تُحفظ نسخة احتياطية قبل التعديل)",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
     )
-    if ans != QMessageBox.Yes:
+    if ans != QMessageBox.StandardButton.Yes:
         return False
     cfg = ctx.config()
     for entry in entries:
@@ -924,7 +933,7 @@ def delete_entries(ctx, entries):
     sent = post_reload()
     ctx.refresh_all()
     ctx.show_status(
-        "تم حذف %d اختصارًا" % len(entries) + ("" if sent else " (المحرك غير مشغّل)")
+        f"تم حذف {len(entries)} اختصارًا" + ("" if sent else " (المحرك غير مشغّل)")
     )
     return True
 
@@ -1011,12 +1020,12 @@ class HomePage(QWidget):
 
         self.table = make_table()
         self.table.doubleClicked.connect(self._edit_selected)
-        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
         lay.addWidget(self.table, 1)
 
         self._empty = attach_empty_state(self.table)
-        delete_shortcut = QShortcut(QKeySequence.Delete, self.table)
+        delete_shortcut = QShortcut(QKeySequence.StandardKey.Delete, self.table)
         delete_shortcut.activated.connect(self._delete_selected)
 
     def _filter(self, term):
@@ -1044,9 +1053,8 @@ class HomePage(QWidget):
 
     def _delete_selected(self):
         entry = selected_entry(self.table)
-        if entry:
-            if delete_entries(self.ctx, [entry]):
-                self.refresh()
+        if entry and delete_entries(self.ctx, [entry]):
+            self.refresh()
 
     def _context_menu(self, pos):
         entry = selected_entry(self.table)
@@ -1061,7 +1069,7 @@ class HomePage(QWidget):
 # ------------------------------------------------------------------ الصفحة 2: اختصار جديد
 
 
-class AddPage(QWidget, WindowPickMixin):
+class AddPage(WindowPickMixin, QWidget):
     def __init__(self, ctx):
         super().__init__()
         self.ctx = ctx
@@ -1133,7 +1141,7 @@ class AddPage(QWidget, WindowPickMixin):
         # حقول ديناميكية حسب النوع
         self.fields = QStackedWidget()
         self.path_edits = {}
-        for index, (code, _label) in enumerate(ACTION_TYPES):
+        for _index, (code, _label) in enumerate(ACTION_TYPES):
             page = QWidget()
             pl = QVBoxLayout(page)
             if code == "script_existing":
@@ -1234,7 +1242,7 @@ class AddPage(QWidget, WindowPickMixin):
             elif lower.endswith(".ahk"):
                 self.type_combo.setCurrentIndex(TYPE_INDEX["script_code"])
                 try:
-                    with open(path, "r", encoding="utf-8-sig", errors="replace") as f:
+                    with open(path, encoding="utf-8-sig", errors="replace") as f:
                         self.code_edit.setPlainText(f.read())
                 except OSError:
                     pass
@@ -1297,12 +1305,16 @@ class AddPage(QWidget, WindowPickMixin):
                 QMessageBox.warning(
                     self,
                     "خطأ",
-                    "اسم السكربت مستخدم بالفعل لاختصار آخر:\n%s" % hk.fullkey,
+                    f"اسم السكربت مستخدم بالفعل لاختصار آخر:\n{hk.fullkey}",
                 )
                 return None
         path = os.path.join(SCRIPTS_DIR, name)
-        with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
-            f.write(content.rstrip("\n") + "\n")
+        try:
+            with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
+                f.write(content.rstrip("\n") + "\n")
+        except OSError as exc:
+            QMessageBox.critical(self, "خطأ", f"فشل حفظ ملف السكربت:\n{exc}")
+            return None
         return name
 
     def _save(self):
@@ -1321,11 +1333,10 @@ class AddPage(QWidget, WindowPickMixin):
             ans = QMessageBox.question(
                 self,
                 "تحذير",
-                "المفتاح مستخدم بالفعل:\n%s\nهل تريد استبداله؟"
-                % describe_conflict(conflict),
-                QMessageBox.Yes | QMessageBox.No,
+                f"المفتاح مستخدم بالفعل:\n{describe_conflict(conflict)}\nهل تريد استبداله؟",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if ans != QMessageBox.Yes:
+            if ans != QMessageBox.StandardButton.Yes:
                 return
 
         code, _label = ACTION_TYPES[self.type_combo.currentIndex()]
@@ -1413,8 +1424,8 @@ class ManagePage(QWidget):
 
         self.table = make_table()
         self.table.doubleClicked.connect(self._edit_selected)
-        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
         lay.addWidget(self.table, 1)
 
@@ -1474,7 +1485,7 @@ class ManagePage(QWidget):
 
     def _refresh_unused(self):
         self.unused_list.clear()
-        used = set(p.replace("/", "\\") for p in self.ctx.config().used_scripts())
+        used = {p.replace("/", "\\") for p in self.ctx.config().used_scripts()}
         for f in sorted(glob.glob(os.path.join(SCRIPTS_DIR, "*.ahk"))):
             name = os.path.basename(f)
             if name.lower() == "gdip.ahk":
@@ -1483,7 +1494,7 @@ class ManagePage(QWidget):
             if rel not in used:
                 self.unused_list.addItem(name)
         count = self.unused_list.count()
-        self.unused_group.setTitle("سكربتات غير مستخدمة (%d)" % count)
+        self.unused_group.setTitle(f"سكربتات غير مستخدمة ({count})")
         self._unused_empty()
 
     def _edit_selected(self):
@@ -1497,8 +1508,11 @@ class ManagePage(QWidget):
         for row in rows:
             item = self.table.item(row, 0)
             if item:
-                kind, fullkey = item.data(Qt.UserRole)
-                action = self.table.item(row, 2).text().replace(MISSING_MARKER, "")
+                kind, fullkey = item.data(Qt.ItemDataRole.UserRole)
+                item_action = self.table.item(row, 2)
+                action = (item_action.text() if item_action else "").replace(
+                    MISSING_MARKER, ""
+                )
                 entries.append(HotkeyEntry(kind, fullkey, action))
         return entries
 
@@ -1524,17 +1538,17 @@ class ManagePage(QWidget):
         ans = QMessageBox.question(
             self,
             "تأكيد",
-            'سيُحذف السكربت "%s" نهائيًا من القرص. متابعة؟' % name,
-            QMessageBox.Yes | QMessageBox.No,
+            f'سيُحذف السكربت "{name}" نهائيًا من القرص. متابعة؟',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if ans != QMessageBox.Yes:
+        if ans != QMessageBox.StandardButton.Yes:
             return
         path = os.path.join(SCRIPTS_DIR, name)
         try:
             os.remove(path)
             self.ctx.show_status("تم حذف السكربت " + name)
         except OSError as exc:
-            QMessageBox.critical(self, "خطأ", "فشل الحذف:\n%s" % exc)
+            QMessageBox.critical(self, "خطأ", f"فشل الحذف:\n{exc}")
         self._refresh_unused()
         self.ctx.refresh_all()
 
@@ -1542,7 +1556,7 @@ class ManagePage(QWidget):
 # ------------------------------------------------------------------ الصفحة 4: الإعدادات
 
 
-class SettingsPage(QWidget, WindowPickMixin):
+class SettingsPage(WindowPickMixin, QWidget):
     def __init__(self, ctx):
         super().__init__()
         self.ctx = ctx
@@ -1634,7 +1648,7 @@ class SettingsPage(QWidget, WindowPickMixin):
         if not path:
             return
         current = edit.text().strip()
-        edit.setText(("%s,%s" % (current, path)) if current else path)
+        edit.setText(f"{current},{path}" if current else path)
 
     def refresh(self):
         cfg = self.ctx.config()
@@ -1725,7 +1739,7 @@ class SecurityPage(QWidget):
         fg.addWidget(self.folders_hint)
         go_settings = QPushButton("فتح صفحة الإعدادات")
         go_settings.clicked.connect(lambda: self.ctx.goto_page(3))
-        fg.addWidget(go_settings, 0, Qt.AlignLeft)
+        fg.addWidget(go_settings, 0, Qt.AlignmentFlag.AlignLeft)
         lay.addWidget(folders_group)
 
         lay.addStretch()
@@ -1759,8 +1773,8 @@ class SecurityPage(QWidget):
         )
         excluded = settings.get("ExcludedFolders", "")
         self.folders_hint.setText(
-            ("مراقب: %s" % folders if folders else "لا توجد مجلدات مراقبة")
-            + (("   —   مستثنى: %s" % excluded) if excluded else "")
+            (f"مراقب: {folders}" if folders else "لا توجد مجلدات مراقبة")
+            + ((f"   —   مستثنى: {excluded}") if excluded else "")
         )
 
     def _toggle_mode(self):
@@ -1778,7 +1792,7 @@ class SecurityPage(QWidget):
             lines = ["عند التفعيل سيعمل المحرك فورًا ودوريًا على إغلاق العمليات:"]
             lines += ["• " + p for p in (procs[:8] or ["—"])]
             if len(procs) > 8:
-                lines.append("… و%d أخرى" % (len(procs) - 8))
+                lines.append(f"… و{len(procs) - 8} أخرى")
             watched = settings.get("MonitoredFoldersWithSub", "") or settings.get(
                 "MonitoredFolders", ""
             )
@@ -1788,9 +1802,9 @@ class SecurityPage(QWidget):
                 self,
                 "تفعيل وضع التسريع",
                 "\n".join(lines),
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if ans != QMessageBox.Yes:
+            if ans != QMessageBox.StandardButton.Yes:
                 return
 
         new_state = "1" if not active else "0"
@@ -1842,7 +1856,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("FlxAHK — لوحة التحكم")
         self.resize(980, 640)
-        self.setLayoutDirection(Qt.RightToLeft)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self._cfg = FlxConfig(INI_PATH)
         self.settings_store = QSettings("FlxAHK", "GUI")
 
@@ -1862,17 +1876,17 @@ class MainWindow(QMainWindow):
 
         app_title = QLabel("⚡ FlxAHK")
         app_title.setObjectName("AppTitle")
-        app_title.setAlignment(Qt.AlignCenter)
+        app_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         side_lay.addWidget(app_title)
 
         self.sidebar_group = QButtonGroup(self)
         self.sidebar_group.setExclusive(True)
         self.nav_buttons = []
         for i, (icon, label, tip) in enumerate(PAGES):
-            btn = QPushButton("%s  %s" % (icon, label))
+            btn = QPushButton(f"{icon}  {label}")
             btn.setObjectName("SidebarButton")
             btn.setCheckable(True)
-            btn.setCursor(Qt.PointingHandCursor)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setToolTip(tip)
             btn.clicked.connect(lambda _=False, idx=i: self.goto_page(idx))
             self.sidebar_group.addButton(btn)
@@ -1883,7 +1897,7 @@ class MainWindow(QMainWindow):
 
         version = QLabel("v2 · PySide6")
         version.setObjectName("SidebarHint")
-        version.setAlignment(Qt.AlignCenter)
+        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version.setToolTip("تعمل هذه الواجهة مستقلة أيضًا:\npythonw Scripts\\FlxGUI.py")
         side_lay.addWidget(version)
         root.addWidget(sidebar)
@@ -1936,8 +1950,9 @@ class MainWindow(QMainWindow):
 
     def refresh_page(self, index):
         page = self.stack.widget(index)
-        if hasattr(page, "refresh"):
-            page.refresh()
+        refresh = getattr(page, "refresh", None)
+        if callable(refresh):
+            refresh()
 
     def refresh_all(self):
         for i in range(self.stack.count()):
@@ -1950,13 +1965,73 @@ class MainWindow(QMainWindow):
 
     def _focus_search(self):
         page = self.stack.currentWidget()
-        if hasattr(page, "search"):
-            page.search.setFocus()
-            page.search.selectAll()
+        search = getattr(page, "search", None)
+        if search is not None:
+            search.setFocus()
+            search.selectAll()
 
     def closeEvent(self, event):
+        # زر X يخفي النافذة للجوار بدل الإنهاء — الواجهة تبقى مقيمة بالخلفية
+        # (الإغلاق الفعلي من قائمة جوار النظام)
+        event.ignore()
+        self.hide_to_tray()
+
+    # ---------- الإقامة في جوار النظام ----------
+
+    def show_window(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def hide_to_tray(self):
         self.settings_store.setValue("geometry", self.saveGeometry())
-        super().closeEvent(event)
+        self.hide()
+        # نفرّغ الذاكرة الفيزيائية فورًا — وينوزع النظام يعيدها عند الحاجة
+        with contextlib.suppress(OSError):
+            ctypes.windll.kernel32.SetProcessEmptyWorkingSet(-1)
+        self._tray_hint()
+
+    def _create_tray(self):
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DesktopIcon)
+        self.tray = QSystemTrayIcon(icon, self)
+        self.tray.setToolTip("FlxAHK — لوحة التحكم\nنقرة مزدوجة: إظهار")
+        menu = QMenu()
+        act_show = menu.addAction("إظهار")
+        act_hide = menu.addAction("إخفاء")
+        menu.addSeparator()
+        act_quit = menu.addAction("خروج")
+        act_show.triggered.connect(self.show_window)
+        act_hide.triggered.connect(self.hide_to_tray)
+        act_quit.triggered.connect(self._quit_from_tray)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(self._tray_activated)
+        self.tray.show()
+
+    def _tray_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            if self.isVisible():
+                self.hide_to_tray()
+            else:
+                self.show_window()
+
+    def _tray_hint(self):
+        """تنبيه لمرة واحدة أول مرة تنخفي للجوار حتى لا يظن المستخدم أنها أُغلقت."""
+        if getattr(self, "_hint_shown", False):
+            return
+        self._hint_shown = True
+        self.tray.showMessage(
+            "FlxAHK",
+            "لا تزال الواجهة تعمل بالخلفية — أيقونتها في جوار النظام،\n"
+            "والخروج الكامل من قائمتها (زر أيمن ← خروج).",
+            QSystemTrayIcon.MessageIcon.Information,
+            5000,
+        )
+
+    def _quit_from_tray(self):
+        self.settings_store.setValue("geometry", self.saveGeometry())
+        if getattr(self, "tray", None):
+            self.tray.hide()
+        QApplication.quit()
 
     def _switch_animate(self, index):
         page = self.stack.widget(index)
@@ -1968,9 +2043,11 @@ class MainWindow(QMainWindow):
         anim.setDuration(180)
         anim.setStartValue(0.35)
         anim.setEndValue(1.0)
-        anim.setEasingCurve(QEasingCurve.OutCubic)
-        anim.finished.connect(lambda: page.setGraphicsEffect(None))
-        anim.start(QPropertyAnimation.DeleteWhenStopped)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.finished.connect(
+            lambda: page.setGraphicsEffect(None)  # type: ignore[arg-type]
+        )
+        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
 
 
 # ------------------------------------------------------------------ نسخة واحدة فقط
@@ -1981,9 +2058,12 @@ SINGLE_INSTANCE_KEY = "FlxAHK_GUI"
 
 
 class SingleInstance:
-    def __init__(self, on_second_instance):
+    """قفل نسخة واحدة عبر named pipe + بروتوكول أوامر نصية:
+    show / hide / toggle / quit"""
+
+    def __init__(self, on_command):
         self.server = None
-        self.on_second_instance = on_second_instance
+        self.on_command = on_command
 
     def try_lock(self):
         socket = QLocalSocket()
@@ -2001,14 +2081,23 @@ class SingleInstance:
         return True
 
     def _on_connection(self):
+        if self.server is None:
+            return
         socket = self.server.nextPendingConnection()
         if not socket:
             return
 
+        buffer = bytearray()
+
         def _handle_ready_read():
             while socket.bytesAvailable():
-                socket.read(64)
-            self.on_second_instance()
+                buffer.extend(socket.read(64).data())
+            while b"\n" in buffer:
+                line, _, rest = buffer.partition(b"\n")
+                del buffer[: len(line) + 1]
+                cmd = line.decode("utf-8", errors="replace").strip()
+                if cmd:
+                    self.on_command(cmd)
 
         socket.readyRead.connect(_handle_ready_read)
 
@@ -2018,24 +2107,31 @@ class SingleInstance:
 
 def main():
     app = QApplication(sys.argv)
-    app.setLayoutDirection(Qt.RightToLeft)
+    app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    app.setQuitOnLastWindowClosed(False)  # النافذة تُخفى للجوار ولا تُنهي التطبيق
     load_stylesheet(app)
 
-    window_holder = {}
-
-    def bring_to_front():
+    def handle_command(cmd):
         win = window_holder.get("win")
-        if win:
-            win.showNormal()
-            win.raise_()
-            win.activateWindow()
+        if not win:
+            return
+        if cmd == "show":
+            win.show_window()
+        elif cmd == "hide":
+            win.hide_to_tray()
+        elif cmd == "toggle":
+            win.show_window() if not win.isVisible() else win.hide_to_tray()
+        elif cmd == "quit":
+            win._quit_from_tray()
 
-    guard = SingleInstance(bring_to_front)
+    window_holder = {}
+    guard = SingleInstance(handle_command)
     if not guard.try_lock():
         sys.exit(0)
 
     window = MainWindow()
     window_holder["win"] = window
+    window._create_tray()
     window.show()
     sys.exit(app.exec())
 
