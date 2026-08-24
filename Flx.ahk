@@ -194,11 +194,42 @@ ExecuteNoFlxHotkeyConditional:
     }
 return
 
+;------------------ ربط الواجهة الجديدة (PySide6) ------------------
+; FlxGUI.py يرسل WM_APP عند حفظ الإعدادات، فنعيد تشغيل المحرك لقراءتها فورًا
+OnMessage(0x8000, "HandleFlxGUIReload")
+
+HandleFlxGUIReload(wParam, lParam, msg, hwnd) {
+    if (wParam = 0x464C58) {
+        SetTimer, DoFlxGUIReload, -50
+        return 1
+    }
+}
+
+DoFlxGUIReload:
+    Reload
+return
+
+; تشغيل واجهة PySide6 الجديدة
+OpenFlxGUI:
+    guiPyFile := A_ScriptDir "\Scripts\FlxGUI.py"
+    if FileExist(guiPyFile) {
+        Run, pythonw.exe "%guiPyFile%", %A_ScriptDir%\Scripts, UseErrorLevel
+        if (ErrorLevel) {
+            Run, python.exe "%guiPyFile%", %A_ScriptDir%\Scripts, UseErrorLevel
+        }
+        if (ErrorLevel) {
+            MsgBox, 48, خطأ, لم يتم العثور على Python لتشغيل الواجهة:`n%guiPyFile%
+        }
+    } else {
+        MsgBox, 48, خطأ, ملف الواجهة غير موجود: %guiPyFile%
+    }
+return
+
 ;------------------ Hotkeys ------------------
 
-; تعريف الاختصار الإضافي Ctrl+Win+=
+; تعريف الاختصار الإضافي Ctrl+Win+= (يفتح الواجهة الحديثة)
 ^#+=::
-OpenCustomHotkeysGUI()
+Gosub, OpenFlxGUI
 return
 
 ;------------------ Functions ------------------
@@ -496,7 +527,7 @@ ReloadHotkeys(oldBaseHotkey) {
     Hotkey, % baseHotkey " & -", OpenInteractiveMode, On
     Hotkey, % baseHotkey " & D", ToggleSecureMode, On
     Hotkey, % baseHotkey " & ,", OpenSettings, On
-    Hotkey, % baseHotkey " & =", OpenCustomHotkeysGUI, On
+    Hotkey, % baseHotkey " & =", OpenFlxGUI, On
 } catch e {
     MsgBox, 48, خطأ, فشل تعريف اختصارات Flx الأساسية:`nالسبب: %e%
 }

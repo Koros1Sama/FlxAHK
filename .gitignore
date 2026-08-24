@@ -1,3 +1,7 @@
 .qodo
 
 Scripts/VlcHistory.ini
+
+Backups/
+__pycache__/
+*.pyc
