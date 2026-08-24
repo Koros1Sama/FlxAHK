@@ -34,9 +34,7 @@ def backup_file(path):
         target = os.path.join(backup_dir, f"{stem}_{stamp}{ext}")
         shutil.copy2(path, target)
         # حذف الأقدم إذا تجاوزنا الحد
-        pattern = re.compile(
-            rf"^{re.escape(stem)}_\d{{8}}_\d{{6}}{re.escape(ext)}$"
-        )
+        pattern = re.compile(rf"^{re.escape(stem)}_\d{{8}}_\d{{6}}{re.escape(ext)}$")
         backups = sorted(f for f in os.listdir(backup_dir) if pattern.match(f))
         for old in backups[:-MAX_BACKUPS]:
             with contextlib.suppress(OSError):
@@ -148,6 +146,7 @@ class IniDocument:
 
 # ================= أدوات خاصة بمجال FlxAHK =================
 
+
 def normalize_stored_key(key):
     """توحيد اسم المفتاح قبل تخزينه في INI (كما يفعل محمل Flx.ahk)."""
     key = key.strip().strip('"')
@@ -193,9 +192,9 @@ class HotkeyEntry:
     """صف اختصار واحد موحّد من أي قسم."""
 
     def __init__(self, kind, fullkey, action):
-        self.kind = kind              # simple | advanced | noflx
-        self.fullkey = fullkey        # كما هو مخزن في INI
-        self.action = action          # القيمة المخزنة
+        self.kind = kind  # simple | advanced | noflx
+        self.fullkey = fullkey  # كما هو مخزن في INI
+        self.action = action  # القيمة المخزنة
         self.key, self.condition = split_fullkey(fullkey)
 
     @property
@@ -277,8 +276,12 @@ class FlxConfig:
         """البحث عن نفس الاختصار في كل الأقسام (غير حساس لحالة الحروف)."""
         wanted = fullkey.lower()
         for entry in self.iter_hotkeys():
-            if exclude_kind and exclude_fullkey and \
-               entry.kind == exclude_kind and entry.fullkey.lower() == exclude_fullkey.lower():
+            if (
+                exclude_kind
+                and exclude_fullkey
+                and entry.kind == exclude_kind
+                and entry.fullkey.lower() == exclude_fullkey.lower()
+            ):
                 continue
             if entry.fullkey.lower() == wanted:
                 return entry
