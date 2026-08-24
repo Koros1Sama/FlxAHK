@@ -1,1 +1,0 @@
-﻿send, Solid pitch-black background ONLY. Replace ALL white areas (inside and outside the frame) with pure #000000 black. Exact unchanged replica of the reference frame. Zero white pixels allowed.

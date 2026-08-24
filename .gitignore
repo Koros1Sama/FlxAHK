@@ -1,7 +1,16 @@
 .qodo
-
-Scripts/VlcHistory.ini
-
 Backups/
 __pycache__/
 *.pyc
+
+# إعدادات شخصية/تشغيلية — لا تُتتبع أبدًا (القالب النظيف: Flx_Settings.example.ini)
+Flx_Settings.ini
+
+# مخلفات محلية
+Scripts/VlcHistory.ini
+Scripts/CopyMoveOld.ahk
+Scripts/black prompt.ahk
+Scripts/debug_ocr.py
+Scripts/debug_uia.py
+Scripts/find_coords.py
+Scripts/test_image.ahk
