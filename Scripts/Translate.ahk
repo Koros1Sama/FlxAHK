@@ -94,12 +94,56 @@ TranslateClients5(text, target) {
     return ""
 }
 
+HexVal(h) {
+    ; حاسب ست عشري نقي — إجبار "0x0645" رقميًا لا يعمل على هذا النظام
+    v := 0
+    Loop, Parse, h
+    {
+        c := Asc(A_LoopField)
+        d := (c >= 48 && c <= 57) ? c - 48 : (c >= 65 && c <= 70) ? c - 55 : (c >= 97 && c <= 102) ? c - 87 : -1
+        if (d < 0)
+            return -1
+        v := (v << 4) | d
+    }
+    return v
+}
+
 JsonUnescape(s) {
-    s := StrReplace(s, "\", Chr(1))
-    s := StrReplace(s, """", """""")
-    s := StrReplace(s, "\n", "`n")
-    s := StrReplace(s, "\t", "`t")
-    return StrReplace(s, Chr(1), "\")
+    ; فك \uXXXX أولًا (مع أزواج الـ surrogate للإيموجي) ثم تهاريب JSON البسيطة
+    out := ""
+    i := 1
+    len := StrLen(s)
+    while (i <= len) {
+        if (SubStr(s, i, 2) = "\u") {
+            hex := SubStr(s, i + 2, 4)
+            if RegExMatch(hex, "^[0-9a-fA-F]{4}$") {
+                cp := HexVal(hex)
+                if (cp >= 0xD800 && cp <= 0xDBFF && SubStr(s, i + 6, 2) = "\u") {
+                    hex2 := SubStr(s, i + 8, 4)
+                    if RegExMatch(hex2, "^[0-9a-fA-F]{4}$") {
+                        low := HexVal(hex2)
+                        if (low >= 0xDC00 && low <= 0xDFFF) {
+                            full := 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00)
+                            out .= (full <= 0xFFFF) ? Chr(full) : Chr(0xD800 + ((full - 0x10000) >> 10)) . Chr(0xDC00 + ((full - 0x10000) & 0x3FF))
+                            i += 12
+                            continue
+                        }
+                    }
+                }
+                out .= (cp < 0xD800 || cp > 0xDFFF) ? Chr(cp) : "?"
+                i += 6
+                continue
+            }
+        }
+        out .= SubStr(s, i, 1)
+        i += 1
+    }
+    "bs" := Chr(92), "q" := Chr(34)
+    out := StrReplace(out, bs . q, q)
+    out := StrReplace(out, bs . "/", "/")
+    out := StrReplace(out, bs . "n", "`n")
+    out := StrReplace(out, bs . "t", "`t")
+    return out
 }
 
 HttpGet(url) {
