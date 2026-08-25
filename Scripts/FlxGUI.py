@@ -828,7 +828,7 @@ def confirm_v2_code(parent, reason):
         f"{reason}\n\nمحرك Flx يشغّل السكربتات بـ AutoHotkey v1 —"
         " هذا السكربت سينكسر عند التشغيل غالبًا\n"
         "(الخطأ النموذجي: leftmost character is illegal in an expression).\n\n"
-        "الحل: أعد كتابته بصيغة v1 (النصوص \"…\" فقط).\n"
+        'الحل: أعد كتابته بصيغة v1 (النصوص "…" فقط).\n'
         "حفظه كما هو رغم ذلك؟",
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         QMessageBox.StandardButton.No,
