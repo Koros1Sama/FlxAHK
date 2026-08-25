@@ -311,3 +311,29 @@ class FlxConfig:
             if value.lower().endswith(".ahk"):
                 used.add(value.replace("/", "\\"))
         return used
+
+    # ---------- حزم المشاركة ----------
+
+    PACK_SECTIONS = ("HotkeySettings", "CustomHotkeys", "AdvancedScripts", "NoFlx")
+
+    def export_pack(self, path):
+        """تصدير الاختصارات (بدون الإعدادات العامة الشخصية) إلى ملف حزمة."""
+        doc = IniDocument()
+        for sec in self.PACK_SECTIONS:
+            for k, v in self.doc.get_section(sec).items():
+                doc.set_value(sec, k, v)
+        doc.save(path)
+        return path
+
+    def import_pack(self, path):
+        """استيراد حزمة اختصارات — المفاتيح المتطابقة تُستبدل، والباقي يُضاف."""
+        src = IniDocument.load(path)
+        count = 0
+        for sec in self.PACK_SECTIONS[1:]:
+            for k, v in src.get_section(sec).items():
+                self.remove_hotkey_everywhere(k)
+                self.doc.set_value(sec, k, v)
+                count += 1
+        if count:
+            self.save()
+        return count

@@ -189,7 +189,7 @@ ExecuteNoFlxHotkeyConditional:
     if (RegExMatch(action, "\.ahk$")) {
         fullPath := (InStr(action, "\") = 1 || InStr(action, ":") = 2) ? action : scriptsDir "\" action
         if FileExist(fullPath) {
-            RunAhkScript(fullPath)
+            RunAhkScript(fullPath, NoFlxHotkeys.HasKey(fullKeyWithCondition) ? fullKeyWithCondition : fullKeyDefault)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }
@@ -337,7 +337,7 @@ ExecuteFromMenu:
         scriptPath := AdvancedScripts[fullKey]
         fullPath := A_ScriptDir "\" scriptPath
         if FileExist(fullPath) {
-            RunAhkScript(fullPath)
+            RunAhkScript(fullPath, fullKey)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }
@@ -499,14 +499,14 @@ ResolveAhkInterpreter() {
     return ""  ; لا يوجد مفسر — النسخة المُجمَّعة وحدها لا تستطيع تشغيل ملفات ahk خارجية
 }
 
-RunAhkScript(fullPath) {
+RunAhkScript(fullPath, hk := "") {
     global gAhkExe, scriptsDir
     if (gAhkExe = "") {
         MsgBox, 48, خطأ, لا يوجد تثبيت AutoHotkey على الجهاز لتشغيل ملفات السكربت الخارجية:`n(النسخة المُجمَّعة Flx.exe لا تشغّلها بنفسها)`n`n%fullPath%
         return
     }
     SetWorkingDir, %scriptsDir%
-    Run, %gAhkExe% "%fullPath%", , UseErrorLevel
+    Run, %gAhkExe% "%fullPath%" "%hk%", , UseErrorLevel
     SetWorkingDir, %A_ScriptDir%
     if (A_LastError) {
         MsgBox, 48, خطأ, فشل تشغيل السكربت: %fullPath%`nخطأ: %A_LastError%
@@ -1918,7 +1918,7 @@ ExecuteHotkey:
         scriptPath := AdvancedScripts[fullKeyWithCondition]
         fullPath := A_ScriptDir "\" scriptPath
         if FileExist(fullPath) {
-            RunAhkScript(fullPath)
+            RunAhkScript(fullPath, fullKeyWithCondition)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }
@@ -1927,7 +1927,7 @@ ExecuteHotkey:
         scriptPath := AdvancedScripts[fullKeyDefault]
         fullPath := A_ScriptDir "\" scriptPath
         if FileExist(fullPath) {
-            RunAhkScript(fullPath)
+            RunAhkScript(fullPath, fullKeyDefault)
         } else {
             MsgBox, 48, خطأ, ملف السكربت غير موجود: %fullPath%
         }

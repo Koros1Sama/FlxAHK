@@ -1667,6 +1667,17 @@ class SettingsPage(WindowPickMixin, QWidget):
         form.addLayout(base_row, len(rows) + 1, 1, 1, 2)
 
         lay.addLayout(form)
+
+        share_row = QHBoxLayout()
+        export_btn = QPushButton("📤 تصدير حزمة الاختصارات…")
+        export_btn.setToolTip("يصدّر الاختصارات فقط (بدون بيانات شخصية) كملف تشاركه")
+        export_btn.clicked.connect(self._export_pack)
+        import_btn = QPushButton("📥 استيراد حزمة…")
+        import_btn.setToolTip("يضيف/يستبدل اختصارات من ملف حزمة استلمته")
+        import_btn.clicked.connect(self._import_pack)
+        share_row.addWidget(export_btn, 1)
+        share_row.addWidget(import_btn, 1)
+        lay.addLayout(share_row)
         lay.addStretch()
 
         save_btn = QPushButton("حفظ الإعدادات")
@@ -1676,6 +1687,46 @@ class SettingsPage(WindowPickMixin, QWidget):
         save_row.addStretch()
         save_row.addWidget(save_btn)
         lay.addLayout(save_row)
+
+    def _export_pack(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "تصدير حزمة الاختصارات", "Flx_Hotkeys_Pack.ini", "INI (*.ini)"
+        )
+        if not path:
+            return
+        try:
+            cfg = self.ctx.config()
+            cfg.export_pack(path)
+        except OSError as exc:
+            QMessageBox.critical(self, "خطأ", f"فشل التصدير:\n{exc}")
+            return
+        self.ctx.show_status(f"تم تصدير الحزمة: {path}")
+
+    def _import_pack(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "استيراد حزمة اختصارات", "", "INI (*.ini)"
+        )
+        if not path:
+            return
+        ans = QMessageBox.question(
+            self,
+            "استيراد حزمة",
+            "ستُستبدل المفاتيح المتطابقة وتُضاف الباقية.\nمتابعة؟",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            cfg = self.ctx.config()
+            count = cfg.import_pack(path)
+        except (OSError, UnicodeError) as exc:
+            QMessageBox.critical(self, "خطأ", f"فشل قراءة الحزمة:\n{exc}")
+            return
+        sent = post_reload()
+        self.ctx.refresh_all()
+        self.ctx.show_status(
+            f"تم استيراد {count} اختصارًا" + ("" if sent else " (المحرك غير مشغّل)")
+        )
 
     def _detect_basekey(self):
         name = KeyDetectDialog.detect(self)
@@ -1947,6 +1998,13 @@ class MainWindow(QMainWindow):
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version.setToolTip("تعمل هذه الواجهة مستقلة أيضًا:\npythonw Scripts\\FlxGUI.py")
         side_lay.addWidget(version)
+
+        help_btn = QPushButton("؟ دليل سريع")
+        help_btn.setObjectName("SidebarButton")
+        help_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        help_btn.setToolTip("أساسيات التشغيل خلال دقيقة")
+        help_btn.clicked.connect(self.show_guide)
+        side_lay.addWidget(help_btn)
         root.addWidget(sidebar)
 
         # المحتوى
@@ -1978,6 +2036,31 @@ class MainWindow(QMainWindow):
         geometry = self.settings_store.value("geometry")
         if geometry is not None:
             self.restoreGeometry(geometry)
+
+        # دليل أول تشغيل — مرة واحدة فقط
+        if self.settings_store.value("onboarded") is None:
+            self.settings_store.setValue("onboarded", 1)
+            QTimer.singleShot(400, self.show_guide)
+
+    def show_guide(self):
+        QMessageBox.information(
+            self,
+            "دليل FlxAHK السريع",
+            "<div dir='rtl' style='text-align:right'>"
+            "<b>التشغيل:</b> شغّل Flx.exe — يعمل بالخلفية (أيقونة AutoHotkey في الجوار).<br><br>"
+            "<b>الزر الأساسي Flx</b> = المفتاح بين Shift الأيسر و Z.<br><br>"
+            "<b>أهم الاختصارات:</b><br>"
+            "• Flx + = : هذه اللوحة (ضغطة ثانية = إخفاء)<br>"
+            "• Flx + - : قائمة كل الاختصارات الجاهزة<br>"
+            "• Flx + D : وضع التركيز (يقفل المشتتات)<br>"
+            "• Flx + Ctrl+T : ترجمة النص المحدد بنافذة منبثقة<br>"
+            "• Flx + Numpad+ : نوتة سريعة بتاريخ ووقت دقيق<br>"
+            "• Flx + Numpad(1/3/4/6) : حفظ بالحافظة · مع Shift: لصق<br><br>"
+            "<b>أول اختصار خلال 30 ثانية:</b><br>"
+            "صفحة «اختصار جديد» ← اكتب المفتاح أو اضغط «اكتشاف» ثم اضغطه فعليًا ←"
+            " اختر نوع الإجراء وعبّئه ← إضافة الاختصار. جاهز!<br><br>"
+            "الدليل الكامل في README.md داخل المجلد.</div>",
+        )
 
     # ---------- API للصفحات ----------
 
