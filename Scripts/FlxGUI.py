@@ -8,6 +8,7 @@ FlxGUI.py — واجهة FlxAHK الحديثة (PySide6).
 """
 
 import os
+import re
 import sys
 import glob
 import ctypes
@@ -708,6 +709,9 @@ class HotkeyEditDialog(WindowPickMixin, QDialog):
                     if not code.strip():
                         QMessageBox.warning(self, "خطأ", "يرجى إدخال كود السكربت.")
                         return
+                    warn = v2_syntax_warning(code)
+                    if warn and not confirm_v2_code(self, warn):
+                        return
                     default_name = (
                         strip_modifiers(split_fullkey(new_fullkey)[0]) or "script"
                     )
@@ -790,6 +794,46 @@ def list_scripts():
         for f in files
         if os.path.basename(f).lower() not in ("gdip.ahk", "test_image.ahk")
     ]
+
+
+# ------------------------------------------------------------------ فحص صيغة v2
+
+V2_MARKERS = ("#Requires AutoHotkey v2", "#Requires AutoHotkey")
+
+
+def v2_syntax_warning(code):
+    """يكشف كودًا بصيغة AutoHotkey v2 — محرك Flx يشغل السكربتات بـ v1 فتنكسر.
+
+    الدليلان الحاسمان: توجيه #Requires، أو نصوص بعلامة اقتباس مفردة
+    '…' في موضع تعبير (حصرية v2 — v1 لا يقبلها ويطلق
+    "leftmost character is illegal in an expression").
+    """
+    head = "\n".join(code.splitlines()[:30])
+    for marker in V2_MARKERS:
+        if marker in head:
+            return f"السكربت يطلب AutoHotkey v2 صراحة: {marker}"
+    for line in code.splitlines():
+        if line.lstrip().startswith(";"):
+            continue  # تعليق — لا يُفحص
+        if re.search(r"(:=\s*|\(\s*)'", line):
+            return "نصوص بعلامة اقتباس مفردة '…' — صيغة v2 فقط (v1 يستخدم \"…\" حصريًا)"
+    return None
+
+
+def confirm_v2_code(parent, reason):
+    """تحذير موحد عند لصق كود v2 — يوقف الحفظ ما لم يصرّح المستخدم."""
+    ans = QMessageBox.question(
+        parent,
+        "تحذير: الكود يبدو بصيغة AutoHotkey v2",
+        f"{reason}\n\nمحرك Flx يشغّل السكربتات بـ AutoHotkey v1 —"
+        " هذا السكربت سينكسر عند التشغيل غالبًا\n"
+        "(الخطأ النموذجي: leftmost character is illegal in an expression).\n\n"
+        "الحل: أعد كتابته بصيغة v1 (النصوص \"…\" فقط).\n"
+        "حفظه كما هو رغم ذلك؟",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No,
+    )
+    return ans == QMessageBox.StandardButton.Yes
 
 
 # ------------------------------------------------------------------ جدول الاختصارات المشترك
@@ -1349,6 +1393,9 @@ class AddPage(WindowPickMixin, QWidget):
                 content = self.code_edit.toPlainText()
                 if not content.strip():
                     raise ValueError("يرجى إدخال كود السكربت.")
+                warn = v2_syntax_warning(content)
+                if warn and not confirm_v2_code(self, warn):
+                    return
                 default_name = self.script_name_edit.text().strip() or strip_modifiers(
                     prefixed_key
                 )
